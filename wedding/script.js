@@ -19,6 +19,23 @@
   );
   // ─────────────────────────────────────────────
 
+  const copyText = (text) => {
+    if (navigator.clipboard) {
+      return navigator.clipboard.writeText(text).catch(() => copyFallback(text));
+    }
+    return copyFallback(text);
+  };
+  const copyFallback = (text) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    return Promise.resolve();
+  };
+
   // Time-of-day tint
   const applyTimeTone = () => {
     const hour = new Date().getHours();
@@ -48,6 +65,37 @@
     };
     updateDday();
     setInterval(updateDday, 1_000);
+  }
+
+  // Copy address
+  const copyAddr = document.getElementById('copyAddr');
+  if (copyAddr) {
+    copyAddr.addEventListener('click', () => {
+      copyText('경기도 성남시 분당구 판교역로226번길 16').then(() => {
+        copyAddr.textContent = '복사 완료';
+        setTimeout(() => { copyAddr.textContent = '주소 복사'; }, 1500);
+      });
+    });
+  }
+
+  // Calendar add (ICS download)
+  const calAdd = document.getElementById('calAdd');
+  if (calAdd) {
+    calAdd.addEventListener('click', () => {
+      const ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'BEGIN:VEVENT',
+        'DTSTART:20261128T020000Z',
+        'DTEND:20261128T040000Z',
+        'SUMMARY:최유정 ♥ 홍석화 결혼식',
+        'LOCATION:W스퀘어컨벤션 8층 채플홀',
+        'DESCRIPTION:경기도 성남시 분당구 판교역로226번길 16',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
+      window.location.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+    });
   }
 
   // Build gallery from GALLERY_PICKS
@@ -91,7 +139,10 @@
   const guestsField = document.getElementById('rsvpGuestsField');
   const guestsCount = document.getElementById('rsvpGuests');
 
-  if (rsvpForm) {
+  if (localStorage.getItem('rsvp_submitted')) {
+    rsvpForm?.remove();
+    if (rsvpDone) rsvpDone.hidden = false;
+  } else if (rsvpForm) {
     let attendance = '참석';
     let guests = 1;
 
@@ -134,6 +185,7 @@
             body: JSON.stringify(data),
           });
         }
+        localStorage.setItem('rsvp_submitted', '1');
         rsvpForm.remove();
         rsvpDone.hidden = false;
       } catch {
@@ -157,7 +209,7 @@
   document.querySelectorAll('.account__copy').forEach((btn) => {
     btn.addEventListener('click', () => {
       const account = btn.dataset.account;
-      navigator.clipboard.writeText(account).then(() => {
+      copyText(account).then(() => {
         btn.textContent = '완료';
         setTimeout(() => { btn.textContent = '복사'; }, 1500);
       });

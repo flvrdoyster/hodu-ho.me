@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>최유정 • 홍석화 WEDDING INVITATION</title>
   <meta property="og:title" content="최유정 • 홍석화 WEDDING INVITATION">
-  <meta property="og:description" content="2026년 11월 28일 토요일 오전 11시 더블유스퀘어컨벤션 8층 채플홀">
+  <meta property="og:description" content="2026년 11월 28일 토요일 오전 11시 W스퀘어컨벤션 8층 채플홀">
   <meta property="og:image" content="https://hodu-ho.me/wedding/assets/thumb.png">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://hodu-ho.me/wedding/">
-  <meta name="description" content="2026년 11월 28일 토요일 오전 11시 더블유스퀘어컨벤션 8층 채플홀">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="description" content="2026년 11월 28일 토요일 오전 11시 W스퀘어컨벤션 8층 채플홀">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" as="style" crossorigin
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
@@ -116,19 +117,25 @@
           <span class="cal__day cal__day--mute">29</span>
           <span class="cal__day">30</span>
         </div>
+        <button class="btn cal__add" id="calAdd" type="button">일정 추가</button>
       </div>
     </section>
 
     <section class="section" data-section="location">
       <div class="loc">
         <div class="loc__venue">
-          <span class="loc__venue-kr">더블유스퀘어컨벤션 8층 채플홀</span>
+          <span class="loc__venue-kr">W스퀘어컨벤션 8층 채플홀</span>
           <span class="loc__venue-en">W SQUARE CONVENTION 8F</span>
           <span class="loc__venue-addr">경기도 성남시 분당구 판교역로226번길 16</span>
         </div>
 
         <div class="loc__map">
           <img src="assets/map.svg" alt="약도" class="loc__map-img">
+        </div>
+
+        <div class="loc__actions">
+          <a class="btn" href="https://map.naver.com/p/search/W스퀘어컨벤션" target="_blank" rel="noopener">네이버지도에서 보기</a>
+          <button class="btn" id="copyAddr" type="button">주소 복사</button>
         </div>
 
         <div class="loc__directions">
@@ -170,8 +177,8 @@
         <div class="rsvp__field">
           <span class="rsvp__label">참석 여부</span>
           <div class="rsvp__toggle">
-            <button type="button" class="rsvp__btn is-active" data-value="참석">참석</button>
-            <button type="button" class="rsvp__btn" data-value="불참">불참</button>
+            <button type="button" class="btn rsvp__btn is-active" data-value="참석">참석</button>
+            <button type="button" class="btn rsvp__btn" data-value="불참">불참</button>
           </div>
         </div>
 
@@ -210,7 +217,7 @@
           <div class="account__item">
             <span class="account__info">우리은행 1002-448-688246</span>
             <span class="account__name">최유정</span>
-            <button class="account__copy" type="button" data-account="1002448688246">복사</button>
+            <button class="btn account__copy" type="button" data-account="1002448688246">복사</button>
           </div>
         </div>
       </div>
@@ -224,7 +231,7 @@
           <div class="account__item">
             <span class="account__info">우리은행 1002-837-832688</span>
             <span class="account__name">홍석화</span>
-            <button class="account__copy" type="button" data-account="1002837832688">복사</button>
+            <button class="btn account__copy" type="button" data-account="1002837832688">복사</button>
           </div>
         </div>
       </div>

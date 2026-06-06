@@ -124,6 +124,25 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Common outline button */
+.btn {
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  color: #1a1a1a;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.btn:active {
+  border-color: #1a1a1a;
+}
+
 /* Family */
 .family {
   display: flex;
@@ -245,6 +264,11 @@ body {
   font-size: 12px;
   line-height: 1.6;
   color: #585757;
+}
+
+.loc__actions {
+  display: flex;
+  gap: 8px;
 }
 
 /* Calendar */
@@ -446,16 +470,7 @@ body {
 }
 
 .rsvp__btn {
-  padding: 10px 0;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #fff;
-  font-family: inherit;
-  font-size: 14px;
   color: #999;
-  cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .rsvp__btn.is-active {
@@ -669,20 +684,7 @@ body {
   grid-column: 2;
   grid-row: 1 / -1;
   align-self: center;
-  padding: 6px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: #fff;
-  font-family: inherit;
-  font-size: 12px;
-  color: #666;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.2s;
-}
-
-.account__copy:active {
-  border-color: #1a1a1a;
+  padding: 8px 14px;
 }
 
 /* Footer */
