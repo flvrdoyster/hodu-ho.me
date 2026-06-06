@@ -1,0 +1,12 @@
+# OS
+.DS_Store
+
+# Local Claude settings
+.claude/settings.local.json
+
+# Design sources (kept local, not deployed)
+*.ai
+print.svg
+print-01.svg
+print-02.svg
+assets/_archived/

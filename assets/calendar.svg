@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 202 196.54">
+  <defs>
+    <style>
+      .cls-1 {
+        letter-spacing: .01em;
+      }
+
+      .cls-1, .cls-2, .cls-3, .cls-4, .cls-5, .cls-6, .cls-7, .cls-8, .cls-9 {
+        isolation: isolate;
+      }
+
+      .cls-1, .cls-2, .cls-3, .cls-4, .cls-9 {
+        fill: #1a1a1a;
+      }
+
+      .cls-1, .cls-3 {
+        font-family: Pretendard-Bold, Pretendard;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .cls-10, .cls-11 {
+        fill: none;
+        stroke: #1a1a1a;
+      }
+
+      .cls-2, .cls-4, .cls-5, .cls-6, .cls-7, .cls-8, .cls-9 {
+        font-size: 10px;
+      }
+
+      .cls-2, .cls-4, .cls-6, .cls-7 {
+        font-family: Pretendard-SemiBold, Pretendard;
+        font-weight: 600;
+      }
+
+      .cls-2, .cls-6, .cls-7 {
+        letter-spacing: .08em;
+      }
+
+      .cls-11 {
+        stroke-miterlimit: 4;
+      }
+
+      .cls-5, .cls-7 {
+        fill: #595757;
+      }
+
+      .cls-5, .cls-8, .cls-9 {
+        font-family: Pretendard-Regular, Pretendard;
+      }
+
+      .cls-6, .cls-8 {
+        fill: #c8c8c9;
+      }
+
+      .cls-12 {
+        letter-spacing: -.02em;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <line class="cls-10" x1="88.2" y1="22.63" x2="108.44" y2="22.63"/>
+    <g>
+      <text class="cls-3" transform="translate(90.82 15.23)"><tspan x="0" y="0">11</tspan></text>
+      <text class="cls-1" transform="translate(88.21 41.25)"><tspan x="0" y="0">28</tspan></text>
+    </g>
+    <text class="cls-6" transform="translate(2.89 66.06)"><tspan x="0" y="0">S</tspan></text>
+    <text class="cls-7" transform="translate(32.33 66.06)"><tspan x="0" y="0">M</tspan></text>
+    <text class="cls-7" transform="translate(64.21 66.06)"><tspan x="0" y="0">T</tspan></text>
+    <text class="cls-7" transform="translate(93.2 66.06)"><tspan x="0" y="0">W</tspan></text>
+    <text class="cls-7" transform="translate(125.58 66.06)"><tspan x="0" y="0">T</tspan></text>
+    <text class="cls-7" transform="translate(156.62 66.06)"><tspan x="0" y="0">F</tspan></text>
+    <text class="cls-2" transform="translate(187 66.06)"><tspan x="0" y="0">S</tspan></text>
+    <text class="cls-8" transform="translate(3.81 91.57)"><tspan x="0" y="0">1</tspan></text>
+    <text class="cls-5" transform="translate(33.75 91.57)"><tspan x="0" y="0">2</tspan></text>
+    <text class="cls-5" transform="translate(64.29 91.57)"><tspan x="0" y="0">3</tspan></text>
+    <text class="cls-5" transform="translate(94.94 91.57)"><tspan x="0" y="0">4</tspan></text>
+    <text class="cls-5" transform="translate(125.76 91.57)"><tspan x="0" y="0">5</tspan></text>
+    <text class="cls-5" transform="translate(156.36 91.57)"><tspan x="0" y="0">6</tspan></text>
+    <text class="cls-9" transform="translate(187.35 91.57)"><tspan x="0" y="0">7</tspan></text>
+    <text class="cls-8" transform="translate(2.97 117.08)"><tspan x="0" y="0">8</tspan></text>
+    <text class="cls-5" transform="translate(33.62 117.08)"><tspan x="0" y="0">9</tspan></text>
+    <text class="cls-5" transform="translate(62.2 117.08)"><tspan x="0" y="0">10</tspan></text>
+    <text class="cls-5" transform="translate(93.67 117.08)"><tspan x="0" y="0">11</tspan></text>
+    <text class="cls-5" transform="translate(123.61 117.08)"><tspan x="0" y="0">12</tspan></text>
+    <text class="cls-5" transform="translate(154.15 117.08)"><tspan x="0" y="0">13</tspan></text>
+    <text class="cls-9" transform="translate(184.8 117.08)"><tspan x="0" y="0">14</tspan></text>
+    <text class="cls-8" transform="translate(.83 142.59)"><tspan x="0" y="0">15</tspan></text>
+    <text class="cls-5" transform="translate(31.43 142.59)"><tspan x="0" y="0">16</tspan></text>
+    <text class="cls-5" transform="translate(62.42 142.59)"><tspan x="0" y="0">17</tspan></text>
+    <text class="cls-5" transform="translate(92.83 142.59)"><tspan x="0" y="0">18</tspan></text>
+    <text class="cls-5" transform="translate(123.48 142.59)"><tspan x="0" y="0">19</tspan></text>
+    <text class="cls-5" transform="translate(153.51 142.59)"><tspan x="0" y="0">20</tspan></text>
+    <text class="cls-9" transform="translate(184.98 142.59)"><tspan x="0" y="0">21</tspan></text>
+    <text class="cls-8" transform="translate(.13 168.09)"><tspan x="0" y="0">22</tspan></text>
+    <text class="cls-5" transform="translate(30.67 168.09)"><tspan x="0" y="0">23</tspan></text>
+    <text class="cls-5" transform="translate(61.39 168.09)"><tspan class="cls-12" x="0" y="0">2</tspan><tspan x="5.72" y="0">4</tspan></text>
+    <text class="cls-5" transform="translate(92.14 168.09)"><tspan x="0" y="0">25</tspan></text>
+    <text class="cls-5" transform="translate(122.74 168.09)"><tspan x="0" y="0">26</tspan></text>
+    <text class="cls-5" transform="translate(153.73 168.09)"><tspan x="0" y="0">27</tspan></text>
+    <text class="cls-4" transform="translate(183.94 168.09)"><tspan x="0" y="0">28</tspan></text>
+    <text class="cls-8" transform="translate(0 193.6)"><tspan x="0" y="0">29</tspan></text>
+    <text class="cls-5" transform="translate(30.62 193.6)"><tspan x="0" y="0">30</tspan></text>
+    <circle class="cls-11" cx="190.11" cy="164.89" r="11.39"/>
+  </g>
+</svg>
