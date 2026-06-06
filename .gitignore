@@ -5,7 +5,6 @@
 .claude/settings.local.json
 
 # Design sources (kept local, not deployed)
-*.ai
 _archived/
 
 # Original photos (only processed webp output is deployed)
