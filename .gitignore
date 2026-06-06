@@ -6,9 +6,6 @@
 
 # Design sources (kept local, not deployed)
 *.ai
-print.svg
-print-01.svg
-print-02.svg
 _archived/
 
 # Original photos (only processed webp output is deployed)

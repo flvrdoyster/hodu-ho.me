@@ -11,13 +11,6 @@
 </head>
 <body>
 
-  <button class="recall" type="button" aria-label="처음으로 돌아가기">
-    <svg class="arrow" width="14" height="28" viewBox="0 0 14 28" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="square">
-      <line x1="7" y1="28" x2="7" y2="4"/>
-      <polyline points="1,10 7,4 13,10"/>
-    </svg>
-  </button>
-
   <main>
 
     <section class="section section--cover" data-section="cover">
@@ -42,12 +35,6 @@
 
       <div class="dday" aria-live="off"></div>
 
-      <button class="hint" type="button" aria-label="청첩장 열기">
-        <svg class="arrow" width="14" height="28" viewBox="0 0 14 28" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="square">
-          <line x1="7" y1="28" x2="7" y2="4"/>
-          <polyline points="1,10 7,4 13,10"/>
-        </svg>
-      </button>
     </section>
 
     <section class="section" data-section="family">
@@ -165,13 +152,81 @@
       <div class="gallery"></div>
     </section>
 
-    <section class="section section--wip" data-section="account">
-      <div class="slot slot--block-sm"></div>
-      <div class="slot slot--block-sm"></div>
+    <section class="section" data-section="rsvp">
+      <form class="rsvp" id="rsvpForm" novalidate>
+        <h3 class="rsvp__heading">참석 의사 전달</h3>
+
+        <div class="rsvp__field">
+          <label class="rsvp__label" for="rsvpName">이름</label>
+          <input class="rsvp__input" type="text" id="rsvpName" name="name" required autocomplete="name" placeholder="이름을 입력해 주세요">
+        </div>
+
+        <div class="rsvp__field">
+          <span class="rsvp__label">참석 여부</span>
+          <div class="rsvp__toggle">
+            <button type="button" class="rsvp__btn is-active" data-value="참석">참석</button>
+            <button type="button" class="rsvp__btn" data-value="불참">불참</button>
+          </div>
+        </div>
+
+        <div class="rsvp__field" id="rsvpGuestsField">
+          <label class="rsvp__label" for="rsvpGuests">동반 인원 <span class="rsvp__hint">(본인 포함)</span></label>
+          <div class="rsvp__stepper">
+            <button type="button" class="rsvp__step" data-delta="-1" aria-label="1명 줄이기">&minus;</button>
+            <span class="rsvp__count" id="rsvpGuests">1</span>
+            <button type="button" class="rsvp__step" data-delta="1" aria-label="1명 늘리기">+</button>
+          </div>
+        </div>
+
+        <div class="rsvp__field">
+          <label class="rsvp__label" for="rsvpMessage">축하 메시지 <span class="rsvp__hint">(선택)</span></label>
+          <textarea class="rsvp__textarea" id="rsvpMessage" name="message" rows="3"></textarea>
+        </div>
+
+        <button type="submit" class="rsvp__submit">전달하기</button>
+      </form>
+
+      <div class="rsvp__done" id="rsvpDone" hidden>
+        <p class="rsvp__done-text">감사합니다<br><span class="rsvp__done-sub">참석 여부가 전달되었습니다</span></p>
+        <p class="rsvp__done-trivia"><span class="rsvp__done-trivia-text"></span> <button class="rsvp__done-trivia-refresh" type="button" aria-label="다른 문구 보기">↻</button></p>
+      </div>
     </section>
 
-    <section class="section section--wip" data-section="footer">
-      <div class="slot slot--text-sm"></div>
+    <section class="section" data-section="account">
+      <h3 class="account__heading">마음 전하실 곳</h3>
+
+      <div class="account__group">
+        <button class="account__toggle" type="button">
+          <span>신부 측</span>
+          <span class="account__arrow">›</span>
+        </button>
+        <div class="account__list" hidden>
+          <div class="account__item">
+            <span class="account__info">우리은행 1002-448-688246</span>
+            <span class="account__name">최유정</span>
+            <button class="account__copy" type="button" data-account="1002448688246">복사</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="account__group">
+        <button class="account__toggle" type="button">
+          <span>신랑 측</span>
+          <span class="account__arrow">›</span>
+        </button>
+        <div class="account__list" hidden>
+          <div class="account__item">
+            <span class="account__info">우리은행 1002-837-832688</span>
+            <span class="account__name">홍석화</span>
+            <button class="account__copy" type="button" data-account="1002837832688">복사</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="section" data-section="footer">
+      <p class="footer__text">함께해 주셔서 감사합니다</p>
     </section>
 
   </main>

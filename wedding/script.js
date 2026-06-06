@@ -19,97 +19,20 @@
   );
   // ─────────────────────────────────────────────
 
-  const cover = document.querySelector('.section--cover');
-  const recall = document.querySelector('.recall');
-  const body = document.body;
-  if (!cover) return;
-
-  let revealed = false;
-  let touchStartY = null;
-  let dragOffset = 0;
-
-  const reveal = () => {
-    if (revealed) return;
-    revealed = true;
-    cover.classList.remove('is-dragging');
-    cover.style.transform = '';
-    cover.classList.add('is-revealed');
-    setTimeout(() => body.classList.add('is-revealed'), 600);
-  };
-
-  const conceal = () => {
-    if (!revealed) return;
-    revealed = false;
-    body.classList.remove('is-revealed');
-    cover.classList.remove('is-revealed');
-    window.scrollTo({ top: 0 });
-  };
-
-  cover.addEventListener('touchstart', (e) => {
-    if (revealed) return;
-    touchStartY = e.touches[0].clientY;
-    cover.classList.add('is-dragging');
-  }, { passive: true });
-
-  cover.addEventListener('touchmove', (e) => {
-    if (revealed || touchStartY === null) return;
-    const delta = e.touches[0].clientY - touchStartY;
-    if (delta < 0) {
-      dragOffset = delta;
-      cover.style.transform = `translateY(${delta}px)`;
-    }
-  }, { passive: true });
-
-  cover.addEventListener('touchend', () => {
-    if (revealed || touchStartY === null) return;
-    cover.classList.remove('is-dragging');
-    if (dragOffset < -80) {
-      reveal();
-    } else {
-      cover.style.transform = '';
-    }
-    touchStartY = null;
-    dragOffset = 0;
-  });
-
-  recall?.addEventListener('click', conceal);
-
-  const hint = document.querySelector('.hint');
-  hint?.addEventListener('click', reveal);
-
-  window.addEventListener('wheel', (e) => {
-    if (!revealed && e.deltaY > 10) {
-      reveal();
-    } else if (revealed && window.scrollY <= 0 && e.deltaY < -20) {
-      conceal();
-    }
-  }, { passive: true });
-
-  window.addEventListener('keydown', (e) => {
-    if (!revealed) {
-      if (['ArrowDown', 'PageDown', 'Space', 'Enter'].includes(e.code)) reveal();
-    } else if (window.scrollY <= 0 && ['ArrowUp', 'PageUp', 'Home'].includes(e.code)) {
-      conceal();
-    }
-  });
-
   // Time-of-day tint
   const applyTimeTone = () => {
     const hour = new Date().getHours();
     let bg = '#ffffff';
-    let slot = '#f0f0f0';
-    if (hour >= 5 && hour < 9)        { bg = '#fafbff'; slot = '#ecedf2'; } // dawn
-    else if (hour >= 9 && hour < 16)  { bg = '#ffffff'; slot = '#f0f0f0'; } // day
-    else if (hour >= 16 && hour < 19) { bg = '#fdf8f2'; slot = '#f0e9df'; } // dusk
-    else                              { bg = '#f5f4f8'; slot = '#e8e7ec'; } // night
-    const root = document.documentElement.style;
-    root.setProperty('--tone-bg', bg);
-    root.setProperty('--tone-slot', slot);
+    if (hour >= 5 && hour < 9)        bg = '#fafbff'; // dawn
+    else if (hour >= 9 && hour < 16)  bg = '#ffffff'; // day
+    else if (hour >= 16 && hour < 19) bg = '#fdf8f2'; // dusk
+    else                              bg = '#f5f4f8'; // night
+    document.documentElement.style.setProperty('--tone-bg', bg);
   };
   applyTimeTone();
   setInterval(applyTimeTone, 60_000);
 
-  // Live D-day  (TODO: replace with actual ceremony datetime)
+  // Live D-day
   const ddayEl = document.querySelector('.dday');
   if (ddayEl) {
     const ceremony = new Date('2026-11-28T11:00:00');
@@ -159,6 +82,109 @@
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Escape') closeLightbox();
     });
+  }
+
+  // RSVP
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx1bdxAOqroqtdd2p-G8ATqmVbL-PcBNN8Atch5WBJEZ_tYprxTRCTBdaxK1WhmYDBsfQ/exec';
+  const rsvpForm = document.getElementById('rsvpForm');
+  const rsvpDone = document.getElementById('rsvpDone');
+  const guestsField = document.getElementById('rsvpGuestsField');
+  const guestsCount = document.getElementById('rsvpGuests');
+
+  if (rsvpForm) {
+    let attendance = '참석';
+    let guests = 1;
+
+    rsvpForm.querySelectorAll('.rsvp__btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        rsvpForm.querySelectorAll('.rsvp__btn').forEach((b) => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        attendance = btn.dataset.value;
+        guestsField.classList.toggle('rsvp__field--hidden', attendance === '불참');
+      });
+    });
+
+    rsvpForm.querySelectorAll('.rsvp__step').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        guests = Math.max(1, Math.min(10, guests + Number(btn.dataset.delta)));
+        guestsCount.textContent = guests;
+      });
+    });
+
+    rsvpForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = rsvpForm.querySelector('#rsvpName').value.trim();
+      if (!name) {
+        rsvpForm.querySelector('#rsvpName').focus();
+        return;
+      }
+      const message = rsvpForm.querySelector('#rsvpMessage').value.trim();
+      const submit = rsvpForm.querySelector('.rsvp__submit');
+      submit.disabled = true;
+      submit.textContent = '전달 중…';
+
+      const data = { name, attendance, guests: attendance === '참석' ? guests : 0, message };
+
+      try {
+        if (APPS_SCRIPT_URL) {
+          await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+        }
+        rsvpForm.remove();
+        rsvpDone.hidden = false;
+      } catch {
+        submit.disabled = false;
+        submit.textContent = '전달하기';
+        alert('전송에 실패했습니다. 다시 시도해 주세요.');
+      }
+    });
+  }
+
+  // Account accordion & copy
+  document.querySelectorAll('.account__toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const list = btn.nextElementSibling;
+      const open = !list.hidden;
+      list.hidden = open;
+      btn.classList.toggle('is-open', !open);
+    });
+  });
+
+  document.querySelectorAll('.account__copy').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const account = btn.dataset.account;
+      navigator.clipboard.writeText(account).then(() => {
+        btn.textContent = '완료';
+        setTimeout(() => { btn.textContent = '복사'; }, 1500);
+      });
+    });
+  });
+
+  // RSVP done trivia
+  const triviaText = document.querySelector('.rsvp__done-trivia-text');
+  const triviaRefresh = document.querySelector('.rsvp__done-trivia-refresh');
+  if (triviaText) {
+    const lines = [
+      '이 청첩장은 신랑이 만들었습니다.',
+      '신부는 이 청첩장이 처음엔 영 탐탁지 않았습니다.',
+      '최호두는 고양이입니다.',
+      '최호두는 동결 건조 간식만 먹습니다.',
+      '이 청첩장은 몰래몰래 계속 업데이트 되고 있습니다.',
+    ];
+    let last = -1;
+    const pick = () => {
+      let i;
+      do { i = Math.floor(Math.random() * lines.length); } while (i === last && lines.length > 1);
+      last = i;
+      triviaText.textContent = lines[i];
+    };
+    pick();
+    triviaRefresh?.addEventListener('click', pick);
+    triviaText.addEventListener('click', pick);
   }
 
   // Scroll reveal sections
