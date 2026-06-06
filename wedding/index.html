@@ -11,6 +11,13 @@
 </head>
 <body>
 
+  <button class="recall" type="button" aria-label="처음으로 돌아가기">
+    <svg class="arrow" width="14" height="28" viewBox="0 0 14 28" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="square">
+      <line x1="7" y1="28" x2="7" y2="4"/>
+      <polyline points="1,10 7,4 13,10"/>
+    </svg>
+  </button>
+
   <main>
 
     <section class="section section--cover" data-section="cover">
@@ -35,12 +42,12 @@
 
       <div class="dday" aria-live="off"></div>
 
-      <div class="hint" aria-hidden="true">
+      <button class="hint" type="button" aria-label="청첩장 열기">
         <svg class="arrow" width="14" height="28" viewBox="0 0 14 28" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="square">
           <line x1="7" y1="28" x2="7" y2="4"/>
           <polyline points="1,10 7,4 13,10"/>
         </svg>
-      </div>
+      </button>
     </section>
 
     <section class="section" data-section="family">
@@ -66,7 +73,56 @@
 
     <section class="section" data-section="date">
       <div class="cal">
-        <img src="assets/calendar.svg" alt="2026년 11월 28일" class="cal__img">
+        <div class="cal__head">
+          <span class="cal__head-num">11</span>
+          <span class="cal__sep"></span>
+          <span class="cal__head-num">28</span>
+        </div>
+
+        <div class="cal__grid">
+          <span class="cal__dow cal__dow--mute">S</span>
+          <span class="cal__dow">M</span>
+          <span class="cal__dow">T</span>
+          <span class="cal__dow">W</span>
+          <span class="cal__dow">T</span>
+          <span class="cal__dow">F</span>
+          <span class="cal__dow">S</span>
+
+          <span class="cal__day cal__day--mute">1</span>
+          <span class="cal__day">2</span>
+          <span class="cal__day">3</span>
+          <span class="cal__day">4</span>
+          <span class="cal__day">5</span>
+          <span class="cal__day">6</span>
+          <span class="cal__day">7</span>
+
+          <span class="cal__day cal__day--mute">8</span>
+          <span class="cal__day">9</span>
+          <span class="cal__day">10</span>
+          <span class="cal__day">11</span>
+          <span class="cal__day">12</span>
+          <span class="cal__day">13</span>
+          <span class="cal__day">14</span>
+
+          <span class="cal__day cal__day--mute">15</span>
+          <span class="cal__day">16</span>
+          <span class="cal__day">17</span>
+          <span class="cal__day">18</span>
+          <span class="cal__day">19</span>
+          <span class="cal__day">20</span>
+          <span class="cal__day">21</span>
+
+          <span class="cal__day cal__day--mute">22</span>
+          <span class="cal__day">23</span>
+          <span class="cal__day">24</span>
+          <span class="cal__day">25</span>
+          <span class="cal__day">26</span>
+          <span class="cal__day">27</span>
+          <span class="cal__day cal__day--target">28</span>
+
+          <span class="cal__day cal__day--mute">29</span>
+          <span class="cal__day">30</span>
+        </div>
       </div>
     </section>
 
@@ -105,8 +161,8 @@
       </div>
     </section>
 
-    <section class="section section--wip" data-section="gallery">
-      <div class="slot slot--block-lg"></div>
+    <section class="section" data-section="gallery">
+      <div class="gallery"></div>
     </section>
 
     <section class="section section--wip" data-section="account">
@@ -116,15 +172,13 @@
 
     <section class="section section--wip" data-section="footer">
       <div class="slot slot--text-sm"></div>
-      <button class="recall" type="button" aria-label="처음으로 돌아가기">
-        <svg class="arrow" width="14" height="28" viewBox="0 0 14 28" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="square">
-          <line x1="7" y1="28" x2="7" y2="4"/>
-          <polyline points="1,10 7,4 13,10"/>
-        </svg>
-      </button>
     </section>
 
   </main>
+
+  <div class="lightbox" aria-hidden="true">
+    <img class="lightbox__img" src="" alt="">
+  </div>
 
   <script src="script.js"></script>
 </body>

@@ -10,3 +10,9 @@ print.svg
 print-01.svg
 print-02.svg
 _archived/
+
+# Original photos (only processed webp output is deployed)
+originals/
+
+# Local-only: gallery number picker
+gallery-index.html
