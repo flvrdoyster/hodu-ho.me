@@ -78,26 +78,6 @@
     });
   }
 
-  // Calendar add (ICS download)
-  const calAdd = document.getElementById('calAdd');
-  if (calAdd) {
-    calAdd.addEventListener('click', () => {
-      const ics = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'BEGIN:VEVENT',
-        'DTSTART:20261128T020000Z',
-        'DTEND:20261128T040000Z',
-        'SUMMARY:최유정 ♥ 홍석화 결혼식',
-        'LOCATION:W스퀘어컨벤션 8층 채플홀',
-        'DESCRIPTION:경기도 성남시 분당구 판교역로226번길 16',
-        'END:VEVENT',
-        'END:VCALENDAR',
-      ].join('\r\n');
-      window.location.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
-    });
-  }
-
   // Build gallery from GALLERY_PICKS
   const gallery = document.querySelector('.gallery');
   if (gallery) {
