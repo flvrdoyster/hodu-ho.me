@@ -1,23 +1,5 @@
 (() => {
-  // ─────────────────────────────────────────────
-  //  갤러리 사진 세트 (전체 1~32). 각 세트에서 1장씩 랜덤 추출 →
-  //  균형 잡힌 9장이 접속할 때마다 새로 표시됩니다 (세트 순서대로 배치).
-  //  번호↔사진 확인: gallery-index.html
-  const GALLERY_SETS = [
-    [1, 2, 3, 4, 5],
-    [6, 7, 8, 9, 10, 11, 12, 13],
-    [14, 15, 16, 17],
-    [18, 19],
-    [20, 21],
-    [22, 23, 24, 25],
-    [26, 27],
-    [28, 29, 30],
-    [31, 32],
-  ];
-  const GALLERY_PICKS = GALLERY_SETS.map(
-    (set) => set[Math.floor(Math.random() * set.length)]
-  );
-  // ─────────────────────────────────────────────
+  const GALLERY_COUNT = 9;
 
   const copyText = (text) => {
     if (navigator.clipboard) {
@@ -78,12 +60,12 @@
     });
   }
 
-  // Build gallery from GALLERY_PICKS
+  // Build gallery
   const gallery = document.querySelector('.gallery');
   if (gallery) {
-    gallery.innerHTML = GALLERY_PICKS.map((n) => {
-      const id = String(n).padStart(2, '0');
-      return `<button class="gallery__item" type="button"><img src="assets/gallery/gallery-${id}.webp" alt="" loading="lazy"></button>`;
+    gallery.innerHTML = Array.from({length: GALLERY_COUNT}, (_, i) => {
+      const id = String(i + 1).padStart(2, '0');
+      return `<button class="gallery__item" type="button"><img src="assets/gallery/gallery-${id}.jpg" alt="" loading="lazy"></button>`;
     }).join('');
   }
 
