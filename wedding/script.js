@@ -64,8 +64,6 @@
   const shareBtn = document.getElementById('shareBtn');
   if (shareBtn) {
     const shareData = {
-      title: '최유정 · 홍석화 결혼합니다',
-      text: '2026년 11월 28일 토요일 오전 11시 · W스퀘어컨벤션',
       url: 'https://hodu-ho.me/wedding/',
     };
     shareBtn.addEventListener('click', () => {
@@ -92,23 +90,45 @@
   // Gallery lightbox
   const lightbox = document.querySelector('.lightbox');
   const lightboxImg = lightbox?.querySelector('.lightbox__img');
+  const lightboxPrev = lightbox?.querySelector('.lightbox__nav--prev');
+  const lightboxNext = lightbox?.querySelector('.lightbox__nav--next');
   if (gallery && lightbox && lightboxImg) {
-    const openLightbox = (img) => {
+    let currentIndex = 0;
+    const galleryImgs = () => Array.from(gallery.querySelectorAll('.gallery__item img'));
+
+    const showAt = (index) => {
+      const imgs = galleryImgs();
+      currentIndex = (index + imgs.length) % imgs.length;
+      const img = imgs[currentIndex];
       lightboxImg.src = img.currentSrc || img.src;
       lightboxImg.alt = img.alt || '';
+    };
+    const openLightbox = (index) => {
+      showAt(index);
       lightbox.classList.add('is-open');
       lightbox.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('no-scroll');
     };
     const closeLightbox = () => {
       lightbox.classList.remove('is-open');
       lightbox.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('no-scroll');
     };
     gallery.addEventListener('click', (e) => {
       const item = e.target.closest('.gallery__item');
-      const img = item?.querySelector('img');
-      if (img) openLightbox(img);
+      if (!item) return;
+      const index = galleryImgs().indexOf(item.querySelector('img'));
+      if (index > -1) openLightbox(index);
     });
     lightbox.addEventListener('click', closeLightbox);
+    lightboxPrev?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showAt(currentIndex - 1);
+    });
+    lightboxNext?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showAt(currentIndex + 1);
+    });
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Escape') closeLightbox();
     });

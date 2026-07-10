@@ -18,6 +18,10 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+body.no-scroll {
+  overflow: hidden;
+}
+
 body {
   background: #ffffff;
   color: #1a1a1a;
@@ -389,6 +393,8 @@ body {
   cursor: zoom-out;
   opacity: 0;
   pointer-events: none;
+  touch-action: none;
+  overscroll-behavior: contain;
   transition: opacity 0.3s ease;
 }
 
@@ -403,6 +409,37 @@ body {
   object-fit: contain;
   transform: scale(0.98);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lightbox__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 1.6rem;
+  color: #1a1a1a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 1;
+}
+
+.lightbox__nav:active {
+  border-color: #1a1a1a;
+}
+
+.lightbox__nav--prev {
+  left: 16px;
+}
+
+.lightbox__nav--next {
+  right: 16px;
 }
 
 .lightbox.is-open .lightbox__img {
@@ -670,7 +707,7 @@ body {
 
 .account__info {
   grid-column: 1;
-  font-size: 1rem;
+  font-size: 0.8rem;
   color: #1a1a1a;
   font-variant-numeric: tabular-nums;
 }
