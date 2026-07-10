@@ -60,6 +60,26 @@
     });
   }
 
+  // Share
+  const shareBtn = document.getElementById('shareBtn');
+  if (shareBtn) {
+    const shareData = {
+      title: '최유정 · 홍석화 결혼합니다',
+      text: '2026년 11월 28일 토요일 오전 11시 · W스퀘어컨벤션',
+      url: 'https://hodu-ho.me/wedding/',
+    };
+    shareBtn.addEventListener('click', () => {
+      if (navigator.share) {
+        navigator.share(shareData).catch(() => {});
+      } else {
+        copyText(shareData.url).then(() => {
+          shareBtn.textContent = '링크가 복사되었어요';
+          setTimeout(() => { shareBtn.textContent = '청첩장 공유하기'; }, 2000);
+        });
+      }
+    });
+  }
+
   // Build gallery
   const gallery = document.querySelector('.gallery');
   if (gallery) {
