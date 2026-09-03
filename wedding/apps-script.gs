@@ -1,15 +1,7 @@
-/**
- * 청첩장 RSVP + 방명록 Apps Script
- *
- * 시트 컬럼 (A~F, 헤더 행 없어도 동작함):
- *   A 날짜(자동)  B 이름  C 참석여부  D 인원  E 메시지  F hide(선택, TRUE면 방명록에서 제외)
- *
- * 배포 방법:
- *   Apps Script 편집기에 이 파일 내용을 그대로 붙여넣기
- *   → 배포 관리 → 편집(연필 아이콘) → 버전: 새 버전 → 배포
- *   ⚠️ "새 배포"를 새로 만들면 URL이 바뀌어서 wedding/script.js의
- *      APPS_SCRIPT_URL이 깨짐. 반드시 기존 배포를 "편집"할 것.
- */
+// 청첩장 RSVP 수집 + 방명록 조회
+// 시트 A~F: 날짜 | 이름 | 참석여부 | 인원 | 메시지 | 비표시(TRUE면 방명록에서 제외)
+// 배포: 배포 관리 → 편집(연필) → 버전은 반드시 "새 버전".
+//       "새 배포"로 만들면 URL이 바뀌어 script.js의 APPS_SCRIPT_URL이 깨짐.
 
 function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -28,12 +20,8 @@ function doPost(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/**
- * 방명록 조회 (JSONP). 참석자이면서 메시지가 있는 행만, 이름은 마스킹해서 반환.
- * 원본 이름·날짜·참석여부·인원은 응답에 절대 포함하지 않음.
- *
- * 사용: GET .../exec?callback=cb  →  cb({"result":"ok","items":[{"name":"홍*화","message":"..."}]})
- */
+// 참석자 중 메시지가 있는 행만, 이름을 마스킹해서 반환.
+// 원본 이름·날짜·참석여부·인원은 응답에 담지 않음.
 function doGet(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var rows = sheet.getDataRange().getValues();
@@ -41,21 +29,19 @@ function doGet(e) {
   var items = [];
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
-    var timestamp = row[0];
-    if (!(timestamp instanceof Date)) continue; // 헤더 행 등 데이터가 아닌 행은 건너뜀
-
-    var name = row[1];
-    var attendance = row[2];
-    var message = row[4];
+    var attendance = String(row[2] || '').trim();
+    var message = String(row[4] || '').trim();
     var hide = row[5];
 
+    // A열 날짜 타입은 검사하지 않음 — getValues()가 주는 Date는 instanceof 판정이
+    // 어긋날 때가 있음. 헤더("참석여부")·불참·빈 행은 아래 검사로 모두 걸러짐.
     if (attendance !== '참석') continue;
-    if (!message || String(message).trim() === '') continue;
+    if (!message) continue;
     if (hide === true || String(hide).trim().toUpperCase() === 'TRUE') continue;
 
     items.push({
-      name: maskName(name),
-      message: String(message).trim()
+      name: maskName(row[1]),
+      message: message
     });
   }
 
@@ -75,12 +61,18 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/** 가운데 마스킹: 2자 "김*" / 3자 "홍*화" / 4자 이상 앞뒤 한 자만 남기고 전부 "*" */
+// 배포 없이 doGet 응답 확인용. 웹앱은 doGet/doPost만 노출하므로 URL로는 접근 불가.
+// Run은 저장된 코드로, URL은 배포된 버전으로 실행됨 — 고쳤으면 이걸로 먼저 확인.
+function debugGuestbook() {
+  Logger.log(doGet({ parameter: {} }).getContent());
+}
+
+// 가운데 마스킹: 2자 "김*" / 3자 "홍*화" / 4자 이상은 앞뒤 한 자만 남김
 function maskName(name) {
   name = String(name || '').trim();
   var len = name.length;
   if (len <= 1) return name;
   if (len === 2) return name.charAt(0) + '*';
-  var stars = new Array(len - 1).join('*'); // len-2개
+  var stars = new Array(len - 1).join('*');
   return name.charAt(0) + stars + name.charAt(len - 1);
 }
