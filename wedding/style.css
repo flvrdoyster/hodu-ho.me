@@ -46,6 +46,12 @@ body {
   border-top: 1px dashed #e5e5e5;
 }
 
+/* .section이 display:flex를 지정하므로, hidden 속성을 쓰는 섹션은
+   이 규칙이 없으면 브라우저 기본 [hidden] 스타일을 덮어써버려 계속 보임 */
+.section[hidden] {
+  display: none;
+}
+
 /* Cover */
 .section--cover {
   min-height: 100dvh;
