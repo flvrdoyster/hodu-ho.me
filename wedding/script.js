@@ -205,6 +205,10 @@
         localStorage.setItem('rsvp_submitted', '1');
         rsvpForm.remove();
         rsvpDone.hidden = false;
+        if (attendance === '참석' && message) {
+          clearGuestbookCache();
+          loadGuestbook(true);
+        }
       } catch {
         submit.disabled = false;
         submit.textContent = '전달하기';
@@ -212,6 +216,112 @@
       }
     });
   }
+
+  // Guestbook (참석자 축하 메시지, 이름 마스킹은 서버에서 처리됨)
+  const GUESTBOOK_CACHE_KEY = 'guestbook_cache_v1';
+  const GUESTBOOK_CACHE_TTL = 5 * 60 * 1000;
+  const GUESTBOOK_PAGE_SIZE = 5;
+
+  function readGuestbookCache() {
+    try {
+      const raw = sessionStorage.getItem(GUESTBOOK_CACHE_KEY);
+      if (!raw) return null;
+      const { ts, items } = JSON.parse(raw);
+      if (!Array.isArray(items) || Date.now() - ts > GUESTBOOK_CACHE_TTL) return null;
+      return items;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeGuestbookCache(items) {
+    try {
+      sessionStorage.setItem(GUESTBOOK_CACHE_KEY, JSON.stringify({ ts: Date.now(), items }));
+    } catch {
+      // 저장 실패해도 렌더링엔 지장 없음 (다음 로드 때 다시 받아옴)
+    }
+  }
+
+  function clearGuestbookCache() {
+    try {
+      sessionStorage.removeItem(GUESTBOOK_CACHE_KEY);
+    } catch {
+      // no-op
+    }
+  }
+
+  function fetchGuestbookJSONP(url) {
+    return new Promise((resolve, reject) => {
+      const cbName = `gbCb${Date.now()}${Math.random().toString(36).slice(2)}`;
+      const script = document.createElement('script');
+      const timer = setTimeout(() => { cleanup(); reject(new Error('guestbook timeout')); }, 8000);
+      function cleanup() {
+        clearTimeout(timer);
+        delete window[cbName];
+        script.remove();
+      }
+      window[cbName] = (data) => { cleanup(); resolve(data); };
+      script.onerror = () => { cleanup(); reject(new Error('guestbook script error')); };
+      script.src = `${url}${url.includes('?') ? '&' : '?'}callback=${cbName}`;
+      document.body.appendChild(script);
+    });
+  }
+
+  let guestbookItems = [];
+  let guestbookShown = 0;
+
+  function renderGuestbookPage() {
+    const next = guestbookItems.slice(guestbookShown, guestbookShown + GUESTBOOK_PAGE_SIZE);
+    next.forEach(({ name, message }) => {
+      const li = document.createElement('li');
+      li.className = 'guestbook__item';
+      const nameEl = document.createElement('span');
+      nameEl.className = 'guestbook__name';
+      nameEl.textContent = name;
+      const msgEl = document.createElement('p');
+      msgEl.className = 'guestbook__message';
+      msgEl.textContent = message;
+      li.append(nameEl, msgEl);
+      guestbookList.appendChild(li);
+    });
+    guestbookShown += next.length;
+    guestbookMore.hidden = guestbookShown >= guestbookItems.length;
+  }
+
+  const guestbookSection = document.getElementById('guestbookSection');
+  const guestbookList = document.getElementById('guestbookList');
+  const guestbookMore = document.getElementById('guestbookMore');
+
+  async function loadGuestbook(force) {
+    if (!guestbookSection || !guestbookList || !guestbookMore || !APPS_SCRIPT_URL) return;
+
+    let items = force ? null : readGuestbookCache();
+    if (!items) {
+      try {
+        const res = await fetchGuestbookJSONP(APPS_SCRIPT_URL);
+        if (res && res.result === 'ok' && Array.isArray(res.items)) {
+          items = res.items;
+          writeGuestbookCache(items);
+        }
+      } catch {
+        items = null; // 실패 시 섹션은 계속 숨김 상태 유지
+      }
+    }
+
+    if (!items || items.length === 0) {
+      guestbookSection.hidden = true;
+      return;
+    }
+
+    guestbookItems = items;
+    guestbookShown = 0;
+    guestbookList.innerHTML = '';
+    renderGuestbookPage();
+    guestbookSection.hidden = false;
+  }
+
+  guestbookMore?.addEventListener('click', renderGuestbookPage);
+  loadGuestbook(false);
 
   // Account accordion & copy
   document.querySelectorAll('.account__toggle').forEach((btn) => {
