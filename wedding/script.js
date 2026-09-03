@@ -1,5 +1,20 @@
 (() => {
-  const GALLERY_COUNT = 9;
+  // 갤러리 목록. 파일명은 실제 앨범 인덱스를 따르므로 연번이 아니어도 됨.
+  // 가로로 긴 사진은 fit: 'contain' — 썸네일에서 잘리지 않고 위아래가 비워짐.
+  const GALLERY = [
+    { src: 'gallery-01.jpg' },
+    { src: 'gallery-03.jpg' },
+    { src: 'gallery-06.jpg' },
+    { src: 'gallery-07.jpg' },
+    { src: 'gallery-08.jpg' },
+    { src: 'gallery-10.jpg' },
+    { src: 'gallery-11.jpg' },
+    { src: 'gallery-12.jpg' },
+    { src: 'gallery-19.jpg' },
+    { src: 'gallery-24.jpg' },
+    { src: 'gallery-28.jpg', fit: 'contain' },
+    { src: 'gallery-30.jpg' },
+  ];
 
   const copyText = (text) => {
     if (navigator.clipboard) {
@@ -81,9 +96,9 @@
   // Build gallery
   const gallery = document.querySelector('.gallery');
   if (gallery) {
-    gallery.innerHTML = Array.from({length: GALLERY_COUNT}, (_, i) => {
-      const id = String(i + 1).padStart(2, '0');
-      return `<button class="gallery__item" type="button"><img src="assets/gallery/gallery-${id}.jpg" alt="" loading="lazy"></button>`;
+    gallery.innerHTML = GALLERY.map(({ src, fit }) => {
+      const cls = fit === 'contain' ? 'gallery__item gallery__item--contain' : 'gallery__item';
+      return `<button class="${cls}" type="button"><img src="assets/gallery/${src}" alt="" loading="lazy"></button>`;
     }).join('');
   }
 

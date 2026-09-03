@@ -378,6 +378,11 @@ body {
   object-fit: cover;
 }
 
+/* 가로로 긴 사진: 잘라내지 않고 좌우를 채운 뒤 위아래를 비움 */
+.gallery__item--contain img {
+  object-fit: contain;
+}
+
 /* Lightbox */
 .lightbox {
   position: fixed;
