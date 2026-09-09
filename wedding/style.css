@@ -23,6 +23,9 @@
   --surface-placeholder: #f0f0f0;
   --scrim: rgba(255, 255, 255, 0.97);
 
+  /* 유일한 유채색 — 표지 부케(couple.svg)에서 가져왔다. 예식일 표시에만 쓴다 */
+  --accent: #ffef50;
+
   /* 커버 배경 틴트 — script.js가 접속 시각에 따라 갱신 */
   --tone-bg: #ffffff;
 
@@ -390,6 +393,8 @@ body {
 
 .cal__day--target {
   font-weight: 700;
+  /* 스택 컨텍스트를 만들어, 뒤에 깔리는 원이 셀 밖으로 빠져나가지 않게 한다 */
+  isolation: isolate;
 }
 
 .cal__day--target::before {
@@ -397,10 +402,11 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 27px;
-  height: 27px;
+  z-index: -1;
+  width: 30px;
+  height: 30px;
   transform: translate(-50%, -50%);
-  border: 1.4px solid var(--ink);
+  background: var(--accent);
   border-radius: 50%;
   pointer-events: none;
 }
