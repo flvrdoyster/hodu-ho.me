@@ -20,26 +20,28 @@
 
 ## 2. 토큰
 
+모든 값은 `style.css`의 `:root`에 **CSS 변수로 정의되어 있다.**
+**스타일시트 본문에 리터럴 값(`#1a1a1a`, `0.8rem`, `4px` …)을 직접 쓰지 않는다.** 반드시 `var(--토큰)`으로 참조한다.
+색 표기는 `:root` 한 곳에서만 다루므로 3자리/6자리 헥스나 `rgb()`가 뒤섞일 일이 없다 (정의는 6자리 헥스, 투명도가 필요한 스크림만 `rgba()`).
+
 ### 2.1 색상
 
-단일 회색 램프. 역할이 정해져 있으므로 **역할에 맞는 값을 고른다.**
+단일 회색 램프. 역할이 정해져 있으므로 **역할에 맞는 토큰을 고른다.**
 
-| 값 | 역할 | 사용처 |
+| 토큰 | 값 | 역할 · 사용처 |
 |---|---|---|
-| `#1a1a1a` | **본문/제목 (ink)** | 모든 기본 텍스트, 이름, 헤딩, 강조 보더, 채움 버튼 배경 |
-| `#585757` | **보조 텍스트** | 영문 장소명, 주소, 오시는 길 상세 |
-| `#999` | **약한 텍스트** | 입력 힌트, 방명록 이름, 비활성 토글 라벨, 더보기 버튼 |
-| `#bbb` | **더 약한 텍스트/아이콘** | placeholder, 아코디언 화살표 |
-| `#ccc` | 최약 텍스트 | RSVP 완료 화면 트리비아 |
-| `#c8c8c8` | 비활성 숫자 | 달력의 일요일·비대상 날짜 |
-| `#ddd` | **기본 보더** | 아웃라인 버튼, 인풋, 원형 버튼 |
-| `#e5e5e5` | 섹션 구분선 | `.section + .section` 점선 |
-| `#eee` | 아코디언 구분선 | `.account__toggle` 하단 |
-| `#f2f2f2` | 리스트 구분선 | 계좌 항목, 방명록 항목 하단 |
-| `#f0f0f0` | 이미지 플레이스홀더 | 갤러리 썸네일 로딩 전 배경 |
-| `#fafafa` | 선택 상태 배경 | `.rsvp__btn.is-active` |
-| `#ffffff` / `#fff` | 표면 | body, 버튼 배경, 커버 그라디언트 하단 |
-| `rgba(255,255,255,0.97)` | 스크림 | 라이트박스 배경 (+ `backdrop-filter: blur(4px)`) |
+| `--ink` | `#1a1a1a` | **본문/제목** — 기본 텍스트, 이름, 헤딩, 강조 보더, 채움 버튼 배경 |
+| `--ink-soft` | `#585757` | **보조 텍스트** — 영문 장소명, 주소, 오시는 길 상세 |
+| `--ink-mute` | `#999999` | **약한 텍스트** — 입력 힌트, 방명록 이름, 비활성 토글 라벨, 부가 안내 |
+| `--ink-faint` | `#bbbbbb` | placeholder, 아코디언 화살표 |
+| `--ink-ghost` | `#c8c8c8` | 최약 — 달력 비활성 날짜, RSVP 완료 트리비아 |
+| `--line` | `#dddddd` | **기본 보더** — 아웃라인 버튼, 인풋, 원형 버튼 |
+| `--line-section` | `#e5e5e5` | **섹션 구분선** (점선, `.section + .section`) |
+| `--line-item` | `#f2f2f2` | **항목 구분선** — 계좌·방명록 리스트, 아코디언 토글 하단 |
+| `--surface` | `#ffffff` | 표면 — body, 버튼 배경, 커버 그라디언트 하단 |
+| `--surface-sunken` | `#fafafa` | 선택 상태 배경 (`.rsvp__btn.is-active`) |
+| `--surface-placeholder` | `#f0f0f0` | 갤러리 썸네일 로딩 전 배경 |
+| `--scrim` | `rgba(255,255,255,0.97)` | 라이트박스 배경 (+ `backdrop-filter: blur(4px)`) |
 
 **금지:** 컬러(유채색) 추가. 그림자(`box-shadow`). 위 램프에 없는 회색 값.
 
@@ -61,15 +63,14 @@
 폰트: `'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif`
 (jsDelivr CDN의 dynamic-subset 버전. `<link rel="preconnect">` 필수.)
 
-**크기 스케일 — 이 5단계 외 사용 금지**
+**크기 스케일 — 이 4단계 외 사용 금지**
 
-| 크기 | 역할 | 사용처 |
+| 토큰 | 값 | 역할 · 사용처 |
 |---|---|---|
-| `1.6rem` | 디스플레이 | 이름(`.name__line`), 달력 월/일 숫자 |
-| `1.2rem` | 강조 본문 | 초대 문구, 장소명(국문), 완료 메시지, 스테퍼 숫자 |
-| `1rem` | **기본** | 본문, 버튼 라벨, 인풋, 섹션 헤딩, 달력 날짜, D-day |
-| `0.85rem` | 리스트 본문 | 방명록 메시지, 더보기 버튼 |
-| `0.8rem` | 캡션 | 라벨, 주소, 상세 설명, 계좌 정보, 영문 장소명 |
+| `--text-display` | `1.6rem` | 디스플레이 — 이름, 달력 월/일 숫자 |
+| `--text-lead` | `1.2rem` | 강조 본문 — 초대 문구, 장소명(국문), 완료 메시지, 스테퍼 숫자 |
+| `--text-base` | `1rem` | **기본** — 본문, 버튼 라벨, 인풋, 섹션 헤딩, 달력 날짜, D-day |
+| `--text-caption` | `0.8rem` | 캡션 — 라벨, 주소, 상세 설명, 계좌·방명록 항목, 부가 안내 |
 
 **무게**
 
@@ -122,26 +123,26 @@
 
 ### 2.4 모서리·보더
 
-| 값 | 용도 |
-|---|---|
-| `4px` | 버튼, 인풋, 텍스트에어리어 |
-| `12px` | 약도 이미지 |
-| `50%` | 원형 버튼(스테퍼·라이트박스 내비), 달력 대상일 표시 |
-| `1px solid #ddd` | 기본 보더 |
-| `1px solid #1a1a1a` | 강조/활성 보더 |
-| `1px dashed #e5e5e5` | 섹션 구분선 |
-| `1.4px solid #1a1a1a` | 달력 대상일 원 (유일한 예외 두께) |
+| 토큰 | 값 | 용도 |
+|---|---|---|
+| `--radius` | `4px` | 버튼, 인풋, 텍스트에어리어 |
+| `--radius-lg` | `12px` | 약도 이미지 |
+| — | `50%` | 원형 (기하값이라 토큰화하지 않음) |
+| `1px solid var(--line)` | 기본 보더 |
+| `1px solid var(--ink)` | 강조/활성 보더 |
+| `1px dashed var(--line-section)` | 섹션 구분선 |
+| `1.4px solid var(--ink)` | 달력 대상일 원 (유일한 예외 두께) |
 
 ### 2.5 모션
 
-| 지속시간 | 이징 | 용도 |
+| 토큰 | 값 | 용도 |
 |---|---|---|
-| `0.2s` | (기본) | 인터랙션 피드백 — 보더 색, 투명도, 화살표 회전 |
-| `0.3s` | `ease` | 라이트박스 페이드 |
-| `0.3s` | `cubic-bezier(0.16, 1, 0.3, 1)` | 라이트박스 이미지 스케일 |
-| `0.8s` | `ease` + `cubic-bezier(0.16, 1, 0.3, 1)` | 스크롤 리빌 (opacity + transform) |
+| `--dur-fast` | `0.2s` | 인터랙션 피드백 — 보더 색, 투명도, 화살표 회전 |
+| `--dur-mid` | `0.3s` | 라이트박스 페이드·이미지 스케일 |
+| `--dur-slow` | `0.8s` | 스크롤 리빌 (opacity + transform) |
+| `--ease-out` | `cubic-bezier(0.16, 1, 0.3, 1)` | 위치가 움직이는 모든 모션 |
 
-**표준 이징: `cubic-bezier(0.16, 1, 0.3, 1)`** — 위치가 움직이는 모든 모션에 사용.
+**표준 이징: `var(--ease-out)`** — 위치가 움직이는 모든 모션에 사용.
 
 ---
 
@@ -201,18 +202,17 @@ body
 
 | 선 | 용도 |
 |---|---|
-| `1px dashed #e5e5e5` | 섹션 사이 (`.section + .section`, 자동 적용) |
-| `1px solid #f2f2f2` | 반복 리스트 항목 사이 (계좌·방명록) |
-| `1px solid #eee` | 아코디언 토글 하단 |
-| `1.4px solid #1a1a1a` | 달력 대상일 원 (장식) |
+| `1px dashed var(--line-section)` | 섹션 사이 (`.section + .section`, 자동 적용) |
+| `1px solid var(--line-item)` | 반복 항목 사이 — 계좌·방명록 리스트, 아코디언 토글 하단 |
+| `1.4px solid var(--ink)` | 달력 대상일 원 (장식) |
 
 반대로 **단발성 부가 텍스트에는 선을 긋지 않는다.** 기존 종속 텍스트는 예외 없이 **색 + 크기만으로** 종속을 표현한다.
 
 | 요소 | 표현 |
 |---|---|
-| `.loc__venue-addr` · `.loc__detail` | `0.8rem` / `#585757` |
-| `.rsvp__hint` · `.rsvp__done-sub` · `.guestbook__name` | `#999` |
-| `.rsvp__done-trivia` | `0.8rem` / `#ccc` |
+| `.loc__venue-addr` · `.loc__detail` | `--text-caption` / `--ink-soft` |
+| `.rsvp__hint` · `.rsvp__done-sub` · `.guestbook__name` · `.account__notice` | `--ink-mute` |
+| `.rsvp__done-trivia` | `--text-caption` / `--ink-ghost` |
 
 부가 텍스트에 선을 그으면 그것이 **새 구획으로 승격**되어, 가장 덜 중요한 내용이 가장 강한 구조 신호를 갖는 **위계 역전**이 일어난다. 섹션 구분선과 같은 점선을 섹션 *안에* 쓰면 특히 나쁘다 — 그 문단이 잘려 나온 별도 섹션처럼 보인다.
 
@@ -227,16 +227,17 @@ body
 **① 기본 (채움)** — 섹션당 하나뿐인 주요 행동
 `.rsvp__submit`, `.share__btn`
 ```
-width: 100%; padding: 12px 0; border: 1px solid #1a1a1a; border-radius: 4px;
-background: #1a1a1a; color: #fff; font-size: 1rem; font-weight: 500; letter-spacing: 0.04em;
+width: 100%; padding: 12px 0; border: 1px solid var(--ink); border-radius: var(--radius);
+background: var(--ink); color: var(--surface);
+font-size: var(--text-base); font-weight: 500; letter-spacing: 0.04em;
 :active { opacity: 0.8 }   :disabled { opacity: 0.4 }
 ```
 
 **② 보조 (아웃라인) — `.btn`** — 병렬 가능한 부수 행동
 ```
-padding: 10px 16px; border: 1px solid #ddd; border-radius: 4px;
-background: #fff; color: #1a1a1a; font-size: 1rem;
-:active { border-color: #1a1a1a }
+padding: 10px 16px; border: 1px solid var(--line); border-radius: var(--radius);
+background: var(--surface); color: var(--ink); font-size: var(--text-base);
+:active { border-color: var(--ink) }
 ```
 `.rsvp__btn`(참석/불참 토글), `.account__copy`(복사) 등이 `.btn`을 확장한다.
 확장할 때 `.btn`의 패딩·폰트 크기를 덮어쓰지 않는다. 폭이 부족하면 **개수를 줄이거나 세로로 쌓는다.**
@@ -244,20 +245,20 @@ background: #fff; color: #1a1a1a; font-size: 1rem;
 > **가로 배치 한계:** 가용 폭 311~356px에서 `.btn` 기본 패딩(좌우 16px) + 1rem 한글 라벨 기준, **한 줄에 안전한 버튼은 2개까지**다. 3개 이상이 필요하면 세로 스택 또는 2열 그리드로 간다.
 
 **③ 텍스트/약한 버튼** — 목록 확장 등
-`.guestbook__more` — 전체 폭 아웃라인이되 `0.85rem`, `color: #999`
+`.guestbook__more` — 전체 폭 아웃라인이되 `--text-caption`, `color: var(--ink-mute)`
 
 **원형 아이콘 버튼**
-`.rsvp__step` 36px · `.lightbox__nav` 44px — `border-radius: 50%`, `1px solid #ddd`
+`.rsvp__step` 36px · `.lightbox__nav` 44px — `border-radius: 50%`, `1px solid var(--line)`
 
 ### 5.2 폼
 
 ```
 .rsvp__field  : flex column, gap 8px  (라벨 + 컨트롤 한 쌍)
-.rsvp__label  : 0.8rem / 600 / 0.02em / #1a1a1a
-.rsvp__hint   : 400 / #999   (라벨 안 괄호 보조문구)
-인풋/텍스트에어리어 : padding 10px 12px, 1px solid #ddd, radius 4px, 1rem
-  :focus       → border-color: #1a1a1a  (outline 없음)
-  ::placeholder→ #bbb
+.rsvp__label  : --text-caption / 600 / 0.02em / --ink
+.rsvp__hint   : 400 / --ink-mute   (라벨 안 괄호 보조문구)
+인풋/텍스트에어리어 : padding 10px 12px, 1px solid var(--line), var(--radius), var(--text-base)
+  :focus       → border-color: var(--ink)  (outline 없음)
+  ::placeholder→ var(--ink-faint)
 ```
 텍스트에어리어는 `resize: none`.
 
@@ -265,21 +266,21 @@ background: #fff; color: #1a1a1a; font-size: 1rem;
 
 ```
 padding: 14px 0;
-border-bottom: 1px solid #f2f2f2;
+border-bottom: 1px solid var(--line-item);
 :last-child { border-bottom: none }   ← 방명록에 적용
 ```
 계좌 항목은 `grid-template-columns: 1fr auto`로 좌측 정보 2줄 + 우측 복사 버튼 세로 중앙.
 
 ### 5.4 아코디언 (마음 전하실 곳)
 
-`.account__toggle` — 전체 폭, `padding: 14px 0`, 하단 `1px solid #eee`, 1rem/500
+`.account__toggle` — 전체 폭, `padding: 14px 0`, 하단 `1px solid var(--line-item)`, `--text-base`/500
 화살표 `›`는 `.is-open`일 때 `rotate(90deg)`, `transition: transform 0.2s`
 목록은 `hidden` 속성으로 토글 (+ `.account__list[hidden] { display: none }`)
 
 ### 5.5 달력
 
 7열 그리드, `gap: 14px 4px`, `max-width: 320px`.
-일요일 열과 지난 날짜는 `#c8c8c8`. 대상일은 `700` + `::before` 27px 원(`1.4px solid #1a1a1a`).
+일요일 열과 지난 날짜는 `--ink-ghost` *(단, 날짜에는 현재 적용되지 않음 — §11 참고)*. 대상일은 `700` + `::before` 27px 원(`1.4px solid var(--ink)`).
 
 ### 5.6 갤러리 / 라이트박스
 
@@ -336,8 +337,9 @@ border-bottom: 1px solid #f2f2f2;
 
 - [ ] **이 내용이 놓일 구간을 §4.2로 판단했는가?** (부가 안내를 핵심 구간에 넣지 않았는가)
 - [ ] **부가 텍스트에 선을 긋지 않았는가?** (종속은 색+크기로만 — §4.3)
+- [ ] **리터럴 값 대신 `var(--토큰)`으로 썼는가?** (본문에 헥스·rem 직접 표기 금지)
 - [ ] 쓰려는 색이 §2.1 램프에 있는가? (없으면 만들지 말고 가장 가까운 역할을 쓴다)
-- [ ] 폰트 크기가 5단계 스케일 안에 있는가?
+- [ ] 폰트 크기가 4단계 스케일 안에 있는가?
 - [ ] 여백이 기존 값(4/6/8/12/14/16/24/32/80)과 맞는가?
 - [ ] 버튼이면 3단 위계 중 하나를 그대로 재사용했는가?
 - [ ] 가로로 나열한 요소가 **375px 기기(가용 311px)** 에서 넘치지 않는가? (`word-break: keep-all` 때문에 한글은 안 접힌다)
@@ -349,13 +351,42 @@ border-bottom: 1px solid #f2f2f2;
 
 ---
 
-## 11. 알려진 불일치 (정리 후보)
+## 11. 알려진 불일치
 
-현재 코드에 남아 있는 미세한 중복. **임의로 바꾸지 말 것** — 정리하려면 별도로 합의하고 한 번에 처리한다.
+### 해소됨
 
-| 항목 | 현황 | 제안 |
+| 항목 | 이전 | 현재 |
 |---|---|---|
-| 최약 회색 | `#ccc`(트리비아)와 `#c8c8c8`(달력)이 거의 동일 | `#c8c8c8` 하나로 통일 |
-| 캡션 크기 | `0.8rem`과 `0.85rem` 혼재 (0.85는 방명록 2곳뿐) | `0.8rem`으로 통일 |
-| 구분선 색 | `#eee`(아코디언)와 `#f2f2f2`(리스트) 혼재 | 역할이 다르므로 유지하되 문서화됨 |
-| 토큰화 | 모든 값이 리터럴로 흩어져 있음 | `:root`에 CSS 변수로 승격 검토 |
+| 색 표기 혼용 | `#fff`(3자리) / `#ffffff`(6자리) / `rgba()` 가 뒤섞임 | `:root`에서만 정의(6자리 헥스, 스크림만 `rgba`), 본문은 전부 `var()` |
+| 최약 회색 중복 | `#ccc`(트리비아) + `#c8c8c8`(달력) — 차이 3/255 | `--ink-ghost` 하나 |
+| 항목 구분선 중복 | `#eee`(아코디언) + `#f2f2f2`(리스트) — 차이 4/255 | `--line-item` 하나 |
+| 캡션 크기 중복 | `0.8rem` + `0.85rem`(방명록 2곳) | `--text-caption` 하나. 방명록 항목이 계좌 항목과 같은 구조가 됐다 |
+| 토큰화 | 모든 값이 리터럴로 흩어져 있음 | `:root`에 23개 토큰, 본문 리터럴 0 |
+
+### 미해결
+
+**달력의 일요일 날짜가 회색으로 표시되지 않는다** *(오늘 작업과 무관한 기존 버그)*
+
+`.cal__day--mute`와 `.cal__day`의 특이도가 같은데 `.cal__day`가 뒤에 선언되어 색을 덮어쓴다.
+그 결과 요일 머리글 `S`는 회색인데 날짜 `1·8·15·22·29`는 평일과 같은 `--ink`로 나온다.
+
+```css
+.cal__dow--mute,
+.cal__day--mute { color: var(--ink-ghost); }   /* 회색 지정 */
+
+.cal__day       { color: var(--ink); }         /* 뒤에 와서 덮어씀 */
+```
+
+고치려면 `.cal__day--mute` 규칙을 `.cal__day` **뒤로** 옮기면 된다. 화면에 보이는 변화가 생기므로 별도 합의 후 처리한다.
+
+### 토큰화하지 않은 것
+
+의도적으로 리터럴로 남겨둔 값들이다.
+
+| 대상 | 이유 |
+|---|---|
+| 여백 (`gap`, `padding`) | 2·4·6·8·12·14·16·18·20·24·32·40·80px로 불규칙해서, 값을 바꾸지 않고는 깔끔한 스케일이 나오지 않는다. `--space-1…13` 식 이름은 의미를 담지 못해 오히려 읽기 어려워진다 |
+| 자간·행간·굵기 | 요소마다 맥락에 맞춰 고른 타이포 판단값이라, 이름을 붙이면 (`--tracking-dow` 같은) 한 곳에서만 쓰는 토큰이 늘어난다 |
+| `50%`, `1.4px`, `100dvh` 등 | 기하·예외값 |
+
+이 값들은 §2.3·§2.2에 표로 정리해 두었으니 거기서 고른다.
