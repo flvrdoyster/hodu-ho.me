@@ -280,7 +280,7 @@ border-bottom: 1px solid var(--line-item);
 ### 5.5 달력
 
 7열 그리드, `gap: 14px 4px`, `max-width: 320px`.
-일요일 열과 지난 날짜는 `--ink-ghost` *(단, 날짜에는 현재 적용되지 않음 — §11 참고)*. 대상일은 `700` + `::before` 27px 원(`1.4px solid var(--ink)`).
+일요일 열과 지난 날짜는 `--ink-ghost`. 대상일은 `700` + `::before` 27px 원(`1.4px solid var(--ink)`).
 
 ### 5.6 갤러리 / 라이트박스
 
@@ -313,6 +313,8 @@ border-bottom: 1px solid var(--line-item);
 ## 8. 네이밍 · 코드 컨벤션
 
 - **BEM**: `block__element--modifier` (`.loc__venue-kr`, `.cal__day--target`)
+- **수식자(`--mute` 등)는 기본 규칙보다 뒤에 선언한다.** 특이도가 같아 순서로 승부가 나므로,
+  앞에 두면 조용히 덮어써진다 (§11의 달력 버그가 이 경우였다)
 - **상태 클래스**: `is-*` (`is-open`, `is-active`, `is-visible`) — 블록에 종속시켜 사용 (`.account__toggle.is-open`)
 - **JS 훅**: 동작만 필요한 경우 `id` 사용 (`#copyAddr`, `#shareBtn`) — 스타일은 클래스로만
 - **CSS 파일 순서**: 리셋 → 루트/전역 → 섹션 레이아웃 → 커버 → 공통(이름·D-day·버튼) → 섹션별 블록(HTML 순서와 동일) → 스크롤 리빌
@@ -362,22 +364,7 @@ border-bottom: 1px solid var(--line-item);
 | 항목 구분선 중복 | `#eee`(아코디언) + `#f2f2f2`(리스트) — 차이 4/255 | `--line-item` 하나 |
 | 캡션 크기 중복 | `0.8rem` + `0.85rem`(방명록 2곳) | `--text-caption` 하나. 방명록 항목이 계좌 항목과 같은 구조가 됐다 |
 | 토큰화 | 모든 값이 리터럴로 흩어져 있음 | `:root`에 23개 토큰, 본문 리터럴 0 |
-
-### 미해결
-
-**달력의 일요일 날짜가 회색으로 표시되지 않는다** *(오늘 작업과 무관한 기존 버그)*
-
-`.cal__day--mute`와 `.cal__day`의 특이도가 같은데 `.cal__day`가 뒤에 선언되어 색을 덮어쓴다.
-그 결과 요일 머리글 `S`는 회색인데 날짜 `1·8·15·22·29`는 평일과 같은 `--ink`로 나온다.
-
-```css
-.cal__dow--mute,
-.cal__day--mute { color: var(--ink-ghost); }   /* 회색 지정 */
-
-.cal__day       { color: var(--ink); }         /* 뒤에 와서 덮어씀 */
-```
-
-고치려면 `.cal__day--mute` 규칙을 `.cal__day` **뒤로** 옮기면 된다. 화면에 보이는 변화가 생기므로 별도 합의 후 처리한다.
+| 달력 일요일 날짜 색 | `.cal__day`가 `.cal__day--mute`보다 뒤에 선언돼 회색을 덮어써, 머리글 `S`만 회색이고 날짜는 검정이었다 | `--mute` 규칙을 `.cal__day` 뒤로 옮겨 해결 |
 
 ### 토큰화하지 않은 것
 

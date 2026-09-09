@@ -376,15 +376,16 @@ body {
   color: var(--ink);
 }
 
-.cal__dow--mute,
-.cal__day--mute {
-  color: var(--ink-ghost);
-}
-
 .cal__day {
   position: relative;
   font-size: var(--text-base);
   color: var(--ink);
+}
+
+/* .cal__day 와 특이도가 같으므로 반드시 뒤에 와야 색이 적용된다 */
+.cal__dow--mute,
+.cal__day--mute {
+  color: var(--ink-ghost);
 }
 
 .cal__day--target {
