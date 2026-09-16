@@ -12,3 +12,7 @@ originals/
 
 # Local-only: gallery number picker
 gallery-index.html
+
+# Pre-ceremony video source material (raw footage + full export; only
+# the encoded copy in wedding/ is deployed)
+pre-ceremony/
