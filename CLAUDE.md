@@ -26,12 +26,13 @@ index.html              → /wedding/ 으로 리다이렉트만 하는 진입점
 404.html                → 빈 폴백
 CNAME                   → hodu-ho.me
 wedding/
-  index.html            청첩장 본문 (섹션 10개)
+  index.html            청첩장 본문 (섹션 11개)
   style.css             전체 스타일 (단일 파일, @media 없음)
   script.js             전체 동작 (단일 IIFE, 의존성 없음)
   STYLE-GUIDE.md        ★ 디자인 시스템 정의서
   apps-script.gs        RSVP·방명록 백엔드 (Google Apps Script, git으로 배포되지 않음)
-  assets/               SVG 일러스트 · 갤러리 이미지
+  pre-ceremony.mp4      식전 영상 (서빙용 인코딩본. 원본·소스는 pre-ceremony/에 두고 gitignore)
+  assets/               SVG 일러스트 · 갤러리 이미지 · 영상 포스터
   printable/            인쇄용 .ai 원본
 scripts/process-gallery.sh   갤러리 이미지 일괄 변환 (macOS 전용, sips 사용)
 ```

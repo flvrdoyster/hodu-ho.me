@@ -509,6 +509,28 @@ body {
   transform: scale(1);
 }
 
+/* Video */
+.video {
+  width: 100%;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.video__player {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.video__caption {
+  font-size: var(--text-caption);
+  line-height: 1.6;
+  color: var(--ink-mute);
+  text-align: center;
+}
+
 /* RSVP */
 .rsvp {
   display: flex;
@@ -887,6 +909,7 @@ body {
 /* Scroll reveal */
 .section:not(.section--cover) .cal,
 .section:not(.section--cover) .gallery,
+.section:not(.section--cover) .video,
 .section:not(.section--cover) .rsvp,
 .section:not(.section--cover) .rsvp__done,
 .section:not(.section--cover) .guestbook__list {
@@ -899,6 +922,7 @@ body {
 
 .section.is-visible .cal,
 .section.is-visible .gallery,
+.section.is-visible .video,
 .section.is-visible .rsvp,
 .section.is-visible .rsvp__done,
 .section.is-visible .guestbook__list {

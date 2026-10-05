@@ -166,7 +166,7 @@ body
 `.section`이 `display: flex`이므로 브라우저 기본 `[hidden]`을 덮어써 버린다. 그래서 `.section[hidden] { display: none }` 규칙이 존재한다.
 **`hidden`으로 토글하는 요소에 `display`를 지정할 때는 반드시 `[hidden] { display: none }`을 같이 정의한다.** (`.rsvp__done`, `.account__list`, `.guestbook__more`도 동일 이유로 각각 정의되어 있다.)
 
-섹션 순서: `cover → family → invite → date → location → gallery → rsvp → guestbook → account → footer`
+섹션 순서: `cover → family → invite → date → location → gallery → video → rsvp → guestbook → account → footer`
 
 ---
 
@@ -176,12 +176,12 @@ body
 
 ### 4.1 문서의 흐름
 
-10개 섹션은 세 구간으로 나뉜다.
+11개 섹션은 세 구간으로 나뉜다.
 
 | 구간 | 섹션 | 독자의 상태 |
 |---|---|---|
 | **핵심** | cover · family · invite · date · location | 누가·언제·어디, 어떻게 가는지 확인 |
-| **감상·행동** | gallery · rsvp · guestbook | 보고, 답하고, 남긴다 |
+| **감상·행동** | gallery · video · rsvp · guestbook | 보고, 답하고, 남긴다 |
 | **부가·마무리** | account · footer | 부가 안내를 받고 마친다 |
 
 정보 확인 → 감정 → 행동 → 부가 안내 순으로 톤이 내려간다.
@@ -290,6 +290,19 @@ border-bottom: 1px solid var(--line-item);
 가로로 긴 사진만 `.gallery__item--contain`으로 `object-fit: contain` (JS의 `GALLERY` 배열에서 `fit: 'contain'`으로 지정).
 라이트박스: 흰색 97% 스크림 + blur(4px), 이미지 `scale(0.98) → 1`, 열릴 때 `body.no-scroll`.
 
+### 5.7 비디오 (식전 영상)
+
+`<video controls playsinline preload="none" poster>` — 컨트롤은 OS 기본을 쓰고, 커스텀 컨트롤을 만들지 않는다.
+갤러리처럼 헤딩 없이 콘텐츠만 둔다. 보면 아는 콘텐츠에는 라벨을 붙이지 않는다.
+영상 아래 설명(`.video__caption`)은 `.account__notice`와 같은 위계다: `--text-caption` / `--ink-mute` / 행간 `1.6` / 가운데, 선 없음 (§4.3).
+소개 문구와 소리 안내는 같은 클래스의 별개 `<p>` 둘로 두고, 섹션 gap(16px)으로 떼어 놓는다.
+- `.video` 래퍼: `width: 100%`, `--radius-lg`, `overflow: hidden`. 플레이어는 `aspect-ratio: 16 / 9`, 배경 `--ink`.
+- `preload="none"` + `poster`: 탭하기 전에는 영상을 받지 않는다 (셀룰러 데이터 보호). 포스터가 없으면 iOS에서 검은 박스로 보인다.
+- `playsinline`: 없으면 iOS가 재생 즉시 전체화면 플레이어를 띄운다.
+- 자동재생을 쓰지 않는다. 소리 있는 영상은 모바일에서 차단된다.
+- 영상 인코딩: H.264 High@4.1 + AAC, 1080p, `+faststart`, 비트레이트 상한 6Mbps. 서버가 Range 요청(`206`)에 응답해야 iOS에서 재생된다 (GitHub Pages는 지원).
+- 인코딩본을 바꿔 커밋하면 용량(약 60MB)만큼 히스토리가 늘어난다. 교체 전에 한 번에 확정한다.
+
 ---
 
 ## 6. 인터랙션 규칙
@@ -305,7 +318,7 @@ border-bottom: 1px solid var(--line-item);
 
 `IntersectionObserver(threshold: 0.15)`가 커버를 제외한 각 `.section`에 `.is-visible`을 붙인다(1회, 후 unobserve).
 
-애니메이션 대상은 **명시된 요소만**이다: `.cal`, `.gallery`, `.rsvp`, `.rsvp__done`, `.guestbook__list`
+애니메이션 대상은 **명시된 요소만**이다: `.cal`, `.gallery`, `.video`, `.rsvp`, `.rsvp__done`, `.guestbook__list`
 → `opacity: 0 → 1`, `translateY(16px) → 0`
 
 텍스트 위주 섹션(family·invite·location·account·footer)은 **의도적으로 애니메이션하지 않는다.** 새 요소를 리빌 대상에 넣으려면 CSS의 두 셀렉터 목록(초기 상태 / `.is-visible`)에 **모두** 추가해야 한다.
