@@ -295,7 +295,7 @@ border-bottom: 1px solid var(--line-item);
 `<video controls playsinline preload="none" poster>` — 컨트롤은 OS 기본을 쓰고, 커스텀 컨트롤을 만들지 않는다.
 갤러리처럼 헤딩 없이 콘텐츠만 둔다. 보면 아는 콘텐츠에는 라벨을 붙이지 않는다.
 영상 아래 설명(`.video__caption`)은 `.account__notice`와 같은 위계다: `--text-caption` / `--ink-mute` / 행간 `1.6` / 가운데, 선 없음 (§4.3).
-소개 문구와 소리 안내는 같은 클래스의 별개 `<p>` 둘로 두고, 섹션 gap(16px)으로 떼어 놓는다.
+문구는 ~합니다체의 완결된 한 문장으로 쓴다. 명사로 끝나는 홍보 문구("선공개" 등)는 다른 섹션의 어조와 어긋난다.
 - `.video` 래퍼: `width: 100%`, `--radius-lg`, `overflow: hidden`. 플레이어는 `aspect-ratio: 16 / 9`, 배경 `--ink`.
 - `preload="none"` + `poster`: 탭하기 전에는 영상을 받지 않는다 (셀룰러 데이터 보호). 포스터가 없으면 iOS에서 검은 박스로 보인다.
 - `playsinline`: 없으면 iOS가 재생 즉시 전체화면 플레이어를 띄운다.
