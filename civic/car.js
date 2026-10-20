@@ -112,9 +112,13 @@
         if (az > .54 && az < .78 && y > .32 && y < .42) return M('trim');
       }
     }
-    if (x < -1.9 && az > .42 && y > .86 && y < 1.05) {
-      if (Math.hypot(az - .60, y - .95) < .05 || Math.hypot(az - .74, y - .95) < .05) return M('lens');
+    if (x < -2.05 && az > .42 && y > .62 && y < .84) {
+      if (Math.hypot(az - .58, y - .73) < .065 || Math.hypot(az - .78, y - .73) < .06) return M('lens');
       return M('tail');
+    }
+    if (x < -2.14) {
+      if (az < .09 && y > .86 && y < .95) return M('trim');
+      if (y > .75 && y < .8 && az < .43) return M('hub');
     }
     return -1;
   }
@@ -194,7 +198,7 @@
   }
   AXLE.forEach(x => { wheel(x, 1); wheel(x, -1); });
 
-  const SHADOW = [[2.36, 0, .96], [2.36, 0, -.96], [-2.36, 0, -.96], [-2.36, 0, .96]];
+  const SH = [2.5, 1.12, 2.6];
 
   let W = 0, P = 3, img = null, zb = null, id = null;
   function size() {
@@ -251,9 +255,17 @@
       }
     }
 
-    const sh = SHADOW.map(proj), shc = cssColor('--line');
-    raster(sh[0], sh[1], sh[2], shc, -1);
-    raster(sh[0], sh[2], sh[3], shc, -1);
+    const shc = cssColor('--line'), mu = cssColor('--muted');
+    const shd = shc.map((v, k) => Math.round(v * .65 + mu[k] * .35));
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const gz = (y + .5 - cy) / (s * se), gx = (x + .5 - cx) / s;
+      const wx = gx * ca - gz * sa, wz = gx * sa + gz * ca;
+      const r = Math.pow(Math.abs(wx) / SH[0], SH[2]) + Math.pow(Math.abs(wz) / SH[1], SH[2]);
+      if (r >= 1) continue;
+      const c = r < .55 ? shd : shc, i = y * W + x;
+      zb[i] = -1e8; id[i] = -1;
+      col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
+    }
 
     const PV = V.map(proj);
     for (const t of T) {
