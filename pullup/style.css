@@ -129,16 +129,14 @@ h1, h2 { margin: 0; }
   stroke-linecap: round;
 }
 .figure__head { fill: var(--ink); }
-.figure__bar,
-.figure__floor {
+.figure__prop {
   stroke: var(--line);
   stroke-width: 5;
   stroke-linecap: round;
+  opacity: 0;
   transition: opacity 0.3s;
 }
-.figure__floor { opacity: 0; }
-.figure.is-resting .figure__bar { opacity: 0; }
-.figure.is-resting .figure__floor { opacity: 1; }
+.figure__prop.is-on { opacity: 1; }
 .figure__limb, .figure__torso { transition: stroke 0.4s; }
 .figure__head { transition: fill 0.4s; }
 
@@ -407,7 +405,7 @@ h1, h2 { margin: 0; }
   transition: width 1s linear;
 }
 .timer__controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-#nextSetBtn { width: 100%; }
+#nextSetBtn { width: 100%; margin-bottom: 10px; }
 
 .fold > summary {
   cursor: pointer;

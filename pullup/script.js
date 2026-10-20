@@ -225,115 +225,16 @@
 
   }
 
-  const POSES = {
-    hang: {
-      armL: [24, 14, 33.5, 29.5, 43, 45], armR: [76, 14, 66.5, 29.5, 57, 45],
-      torso: [50, 48, 50, 80],
-      legL: [44, 80, 40, 100, 44, 118], legR: [56, 80, 60, 100, 56, 118],
-      head: [50, 28],
-    },
-    top: {
-      armL: [24, 14, 13, 25, 43, 29], armR: [76, 14, 87, 25, 57, 29],
-      torso: [50, 32, 50, 62],
-      legL: [44, 62, 40, 82, 44, 100], legR: [56, 62, 60, 82, 56, 100],
-      head: [50, 13],
-    },
-    rest: {
-      armL: [43, 90, 36, 104, 42, 114], armR: [57, 90, 64, 104, 58, 114],
-      torso: [50, 92, 50, 112],
-      legL: [44, 112, 32, 113, 34, 128], legR: [56, 112, 68, 113, 66, 128],
-      head: [50, 72],
-    },
-  };
+  const figure = Figure.create(document.getElementById('figure'), EXERCISES.pullup);
 
-  const figEls = {
-    root: document.getElementById('figure'),
-    armL: document.getElementById('figArmL'),
-    armR: document.getElementById('figArmR'),
-    torso: document.getElementById('figTorso'),
-    legL: document.getElementById('figLegL'),
-    legR: document.getElementById('figLegR'),
-    head: document.getElementById('figHead'),
-  };
+  let resting = false;
 
-  function pathFrom(nums) {
-    let d = `M${nums[0]},${nums[1]}`;
-    for (let i = 2; i < nums.length; i += 2) d += ` L${nums[i]},${nums[i + 1]}`;
-    return d;
+  function setMode(rest) {
+    resting = rest;
+    document.getElementById('setForm').hidden = rest;
+    document.getElementById('timer').hidden = !rest;
+    figure.rest(rest);
   }
-
-  function drawPose(pose) {
-    figEls.armL.setAttribute('d', pathFrom(pose.armL));
-    figEls.armR.setAttribute('d', pathFrom(pose.armR));
-    figEls.torso.setAttribute('d', pathFrom(pose.torso));
-    figEls.legL.setAttribute('d', pathFrom(pose.legL));
-    figEls.legR.setAttribute('d', pathFrom(pose.legR));
-    figEls.head.setAttribute('cx', pose.head[0]);
-    figEls.head.setAttribute('cy', pose.head[1]);
-  }
-
-  function lerpPose(a, b, t) {
-    const out = {};
-    for (const key of Object.keys(a)) out[key] = a[key].map((v, i) => v + (b[key][i] - v) * t);
-    return out;
-  }
-
-  const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2);
-
-  let figCurrent = POSES.hang;
-  let figRaf = null;
-  let figBusy = false;
-  let figQueue = [];
-  let figResting = false;
-
-  function animateTo(target, duration, done) {
-    const from = figCurrent;
-    const start = performance.now();
-    if (figRaf !== null) cancelAnimationFrame(figRaf);
-    const step = (now) => {
-      const t = Math.min(1, (now - start) / duration);
-      figCurrent = lerpPose(from, target, easeInOut(t));
-      drawPose(figCurrent);
-      if (t < 1) figRaf = requestAnimationFrame(step);
-      else if (done) done();
-    };
-    figRaf = requestAnimationFrame(step);
-  }
-
-  const PARTIAL_TOP = lerpPose(POSES.hang, POSES.top, 0.62);
-
-  function playRep(full) {
-    figBusy = true;
-    animateTo(full ? POSES.top : PARTIAL_TOP, 380, () => {
-      animateTo(POSES.hang, 420, () => {
-        if (figQueue.length > 0) playRep(figQueue.shift());
-        else figBusy = false;
-      });
-    });
-  }
-
-  function requestRep(full) {
-    if (figResting) return;
-    if (figBusy) { if (figQueue.length < 3) figQueue.push(full); }
-    else playRep(full);
-  }
-
-  function setFigureResting(on) {
-    renderMode(on);
-    if (figResting === on) return;
-    figResting = on;
-    figBusy = false;
-    figQueue = [];
-    figEls.root.classList.toggle('is-resting', on);
-    animateTo(on ? POSES.rest : POSES.hang, 500);
-  }
-
-  function renderMode(resting) {
-    document.getElementById('setForm').hidden = resting;
-    document.getElementById('timer').hidden = !resting;
-  }
-
-  drawPose(POSES.hang);
 
   let repLog = [];
 
@@ -348,9 +249,9 @@
   function effortStage() {
     const over = romCount() - data.settings.targetReps;
     if (romCount() === 0 || over < 0) return '';
-    if (over === 0) return 'is-goal';
-    if (over < 3) return 'is-over1';
-    return 'is-over2';
+    if (over === 0) return 'goal';
+    if (over < 3) return 'over1';
+    return 'over2';
   }
 
   function renderReps() {
@@ -363,10 +264,8 @@
     document.getElementById('repUndo').disabled = repLog.length === 0;
 
     const stage = effortStage();
-    ['is-goal', 'is-over1', 'is-over2'].forEach((c) => {
-      counterEl.classList.toggle(c, c === stage);
-      figEls.root.classList.toggle(c, c === stage);
-    });
+    for (const st of ['goal', 'over1', 'over2']) counterEl.classList.toggle(`is-${st}`, st === stage);
+    figure.effort(stage);
   }
 
   function bumpCounter() {
@@ -376,36 +275,21 @@
 
   function spillSweat() {
     const over = romCount() - data.settings.targetReps;
-    if (over <= 0) return;
-    const sweat = document.getElementById('figSweat');
-    const drops = over >= 3 ? 3 : 2;
-    for (let i = 0; i < drops; i++) {
-      const drop = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      const side = i % 2 === 0 ? -1 : 1;
-      drop.setAttribute('class', 'sweat');
-      drop.setAttribute('cx', figCurrent.head[0] + side * (7 + Math.random() * 3));
-      drop.setAttribute('cy', figCurrent.head[1] - 2 + Math.random() * 6);
-      drop.setAttribute('r', 2.2);
-      drop.style.setProperty('--dx', `${side * (8 + Math.random() * 10)}px`);
-      drop.style.setProperty('--dy', `${10 + Math.random() * 12}px`);
-      drop.addEventListener('animationend', () => drop.remove());
-      sweat.appendChild(drop);
-    }
+    if (over > 0) figure.sweat(over >= 3 ? 3 : 2);
   }
 
   function countRep(isFullRom) {
-    if (repLog.length >= 99) return;
-    if (figResting) setFigureResting(false);
+    if (resting || repLog.length >= 99) return;
     repLog.push(isFullRom);
     renderReps();
     bumpCounter();
-    requestRep(isFullRom);
+    figure.rep(isFullRom);
     spillSweat();
   }
 
   document.getElementById('repFullBtn').addEventListener('click', () => countRep(true));
   document.getElementById('repPartialBtn').addEventListener('click', () => countRep(false));
-  figEls.root.addEventListener('click', () => countRep(true));
+  figure.el.addEventListener('click', () => countRep(true));
 
   document.getElementById('repUndo').addEventListener('click', () => {
     repLog.pop();
@@ -428,8 +312,8 @@
     repLog = [];
     renderAll();
 
-    resetTimer();
-    setFigureResting(true);
+    rewindTimer();
+    setMode(true);
     if (draft.sets.length < data.settings.targetSets) startTimer();
   });
 
@@ -450,14 +334,12 @@
     if (timerRunning) return;
     ensureAudio();
     timerRunning = true;
-    setFigureResting(true);
     timerInterval = setInterval(() => {
       timerRemaining -= 1;
       if (timerRemaining <= 0) {
-        timerRemaining = 0;
-        stopTimer();
-        setFigureResting(false);
+        endRest();
         beep();
+        return;
       }
       renderTimer();
     }, 1000);
@@ -468,21 +350,22 @@
     clearInterval(timerInterval);
     renderTimer();
   }
-  function resetTimer() {
-    stopTimer();
-    setFigureResting(false);
+  function rewindTimer() {
     timerTotal = data.settings.restSeconds;
     timerRemaining = timerTotal;
     renderTimer();
+  }
+  function endRest() {
+    stopTimer();
+    rewindTimer();
+    setMode(false);
   }
 
   document.getElementById('timerToggle').addEventListener('click', () => {
     timerRunning ? stopTimer() : startTimer();
   });
-  document.getElementById('timerReset').addEventListener('click', resetTimer);
-  document.getElementById('nextSetBtn').addEventListener('click', () => {
-    resetTimer();
-  });
+  document.getElementById('timerReset').addEventListener('click', rewindTimer);
+  document.getElementById('nextSetBtn').addEventListener('click', endRest);
   document.getElementById('timerAdd').addEventListener('click', () => {
     timerRemaining += 30;
     timerTotal = Math.max(timerTotal, timerRemaining);
@@ -529,7 +412,7 @@
     checkDowngrade(session);
     saveData();
     syncSessionToSheets(session);
-    resetTimer();
+    endRest();
     renderAll();
   });
 
@@ -651,7 +534,7 @@
   bindSetting('cfgSheetsUrl', 'sheetsUrl', 'text');
 
   document.getElementById('cfgRestSeconds').addEventListener('change', () => {
-    if (!timerRunning) resetTimer();
+    if (!timerRunning) rewindTimer();
   });
 
   document.getElementById('exportBtn').addEventListener('click', () => {
@@ -680,7 +563,7 @@
         sessions: parsed.sessions,
       };
       saveData();
-      resetTimer();
+      endRest();
       repLog = [];
       renderAll();
       closeSettings();
@@ -695,7 +578,7 @@
     if (!confirm('모든 운동 기록과 설정을 삭제할까요? 되돌릴 수 없어요.')) return;
     data = structuredClone(DEFAULT_DATA);
     saveData();
-    resetTimer();
+    endRest();
     repLog = [];
     renderAll();
     closeSettings();
@@ -711,7 +594,7 @@
     renderHistory();
   }
 
-  resetTimer();
-  repLog = [];
+  rewindTimer();
   renderAll();
+  setMode(ensureDraft().sets.length > 0);
 })();

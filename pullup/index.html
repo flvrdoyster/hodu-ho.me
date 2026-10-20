@@ -34,19 +34,7 @@
         <span class="workout__target" id="targetLabel"></span>
       </div>
 
-      <div class="figure" id="figure">
-        <svg viewBox="0 0 100 150" aria-hidden="true">
-          <line class="figure__bar" x1="12" y1="14" x2="88" y2="14"/>
-          <line class="figure__floor" x1="10" y1="130" x2="90" y2="130"/>
-          <path class="figure__limb" id="figArmL"/>
-          <path class="figure__limb" id="figArmR"/>
-          <circle class="figure__head" id="figHead" r="9"/>
-          <path class="figure__torso" id="figTorso"/>
-          <path class="figure__limb" id="figLegL"/>
-          <path class="figure__limb" id="figLegR"/>
-          <g id="figSweat"></g>
-        </svg>
-      </div>
+      <div class="figure" id="figure"></div>
 
       <div class="band-picker">
         <span class="band-picker__label">밴드 구성 <span class="band-picker__hint">쓸 밴드를 눌러서 켜고 꺼요</span></span>
@@ -89,9 +77,8 @@
           <button type="button" class="btn btn--ghost" id="timerAdd">+30초</button>
         </div>
         <button type="button" class="btn btn--primary" id="nextSetBtn">다음 세트 시작</button>
+        <button type="button" class="btn btn--finish" id="finishBtn" disabled>오늘 운동 종료 &amp; 저장</button>
       </div>
-
-      <button type="button" class="btn btn--finish" id="finishBtn" disabled>오늘 운동 종료 &amp; 저장</button>
     </section>
 
     <details class="card fold progress">
@@ -162,6 +149,8 @@
     </div>
   </div>
 
+  <script src="figure.js"></script>
+  <script src="exercises.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
