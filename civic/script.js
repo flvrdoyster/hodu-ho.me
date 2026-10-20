@@ -80,10 +80,29 @@
       const z = !started && i < s.length - 1;
       return (i === 3 ? '<span class="sep"></span>' : '') + `<span class="d${z ? ' z' : ''}">${d}</span>`;
     }).join('');
-    $('#head').innerHTML = S.kmEdit
+    const html = S.kmEdit
       ? `<span class="odo-label">현재 주행거리</span><div class="km-edit"><input id="kmInput" type="number" inputmode="numeric" min="0" value="${km || ''}" aria-label="현재 주행거리(km)"><button class="btn primary" data-act="saveKm">저장</button><button class="btn" data-act="cancelKm">취소</button></div>`
       : `<span class="odo-label">${!EDIT && D.settings.kmDate ? `주행거리 <span class="num">${esc(D.settings.kmDate)}</span> 기준` : '현재 주행거리'}</span><div class="odo px" role="img" aria-label="주행거리 ${fmt(km)}km">${cells}<span class="u">km</span></div>${ed('<button class="btn ghost" data-act="editKm">주행거리 수정</button>')}`;
+    if (html === renderHead.last) return;
+    renderHead.last = html;
+    $('#head').innerHTML = html;
     if (S.kmEdit) { const i = $('#kmInput'); if (i) { i.focus(); i.select(); } }
+    else if (!renderHead.flipped) { renderHead.flipped = true; flipOdo(); }
+  }
+  function flipOdo() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.querySelectorAll('#head .odo .d').forEach((el, i) => {
+      const fin = Number(el.textContent);
+      let v = 0, n = 10 + fin;
+      el.textContent = '0';
+      const step = () => {
+        v = (v + 1) % 10;
+        el.textContent = String(v);
+        el.classList.remove('f'); void el.offsetWidth; el.classList.add('f');
+        if (--n > 0) setTimeout(step, 42);
+      };
+      setTimeout(step, 120 + i * 90);
+    });
   }
 
   const TABS = [['home', '요약'], ['parts', '교체 주기'], ['log', '정비 이력'], ['stats', '통계'], ['data', '데이터']].filter(t => EDIT || t[0] !== 'data');

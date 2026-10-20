@@ -355,6 +355,12 @@
   };
   cv.addEventListener('pointerup', end);
   cv.addEventListener('pointercancel', end);
+  let lastTouch = 0;
+  cv.addEventListener('touchend', e => {
+    const now = performance.now();
+    if (now - lastTouch < 350) e.preventDefault();
+    lastTouch = now;
+  }, { passive: false });
 
   new IntersectionObserver(es => { seen = es[0].isIntersecting; loop(); }).observe(cv);
   document.addEventListener('visibilitychange', loop);
