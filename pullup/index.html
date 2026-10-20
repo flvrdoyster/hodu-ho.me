@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>풀업 트레이닝</title>
+<meta name="description" content="풀업 세트 기록, 휴식 타이머, Full ROM 진행 추적">
+<meta name="theme-color" content="#101314">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar__title">
+      <span class="topbar__emoji">🐧</span>
+      <div>
+        <h1>풀업 트레이닝</h1>
+        <p class="topbar__date" id="todayLabel"></p>
+      </div>
+    </div>
+    <button type="button" class="iconbtn" id="settingsToggle" aria-label="설정 열기">⚙️</button>
+  </header>
+
+  <main class="main">
+
+    <section class="card banner banner--upgrade" id="downgradeBanner" hidden>
+      <p id="downgradeText"></p>
+      <button type="button" class="banner__dismiss" id="downgradeDismiss" aria-label="닫기">✕</button>
+    </section>
+
+    <section class="card workout" id="workoutCard">
+      <div class="workout__head">
+        <h2>오늘의 세트</h2>
+        <span class="workout__target" id="targetLabel"></span>
+      </div>
+
+      <div class="figure" id="figure">
+        <svg viewBox="0 0 100 150" aria-hidden="true">
+          <line class="figure__bar" x1="12" y1="14" x2="88" y2="14"/>
+          <line class="figure__floor" x1="10" y1="130" x2="90" y2="130"/>
+          <path class="figure__limb" id="figArmL"/>
+          <path class="figure__limb" id="figArmR"/>
+          <circle class="figure__head" id="figHead" r="9"/>
+          <path class="figure__torso" id="figTorso"/>
+          <path class="figure__limb" id="figLegL"/>
+          <path class="figure__limb" id="figLegR"/>
+          <g id="figSweat"></g>
+        </svg>
+      </div>
+
+      <div class="band-picker">
+        <span class="band-picker__label">밴드 구성 <span class="band-picker__hint">쓸 밴드를 눌러서 켜고 꺼요</span></span>
+        <div class="band-row__icons" id="bandIcons"></div>
+      </div>
+
+      <ol class="set-list" id="setList"></ol>
+
+      <p class="warn" id="dropWarning" hidden>⚠️ 직전 세트보다 개수가 크게 줄었어요. 오늘은 여기서 마무리하는 것도 좋아요.</p>
+
+      <form class="set-form" id="setForm">
+        <div class="counter">
+          <span class="counter__value" id="repsValue">0</span>
+          <span class="counter__goal" id="repsGoal"></span>
+          <span class="counter__partial" id="repsPartial" hidden></span>
+        </div>
+
+        <div class="rep-buttons">
+          <button type="button" class="btn btn--rep" id="repFullBtn">
+            Full ROM
+            <small>턱 넘김</small>
+          </button>
+          <button type="button" class="btn btn--rep-partial" id="repPartialBtn">
+            부분
+            <small>개수 미포함</small>
+          </button>
+        </div>
+        <button type="button" class="counter__undo" id="repUndo">방금 것 취소</button>
+
+        <button type="submit" class="btn btn--primary" id="logSetBtn" disabled>세트 기록</button>
+      </form>
+
+      <div class="timer" id="timer" hidden>
+        <p class="timer__label">휴식</p>
+        <div class="timer__display" id="timerDisplay">02:30</div>
+        <div class="timer__bar"><div class="timer__bar-fill" id="timerFill"></div></div>
+        <div class="timer__controls">
+          <button type="button" class="btn btn--ghost" id="timerToggle">시작</button>
+          <button type="button" class="btn btn--ghost" id="timerReset">리셋</button>
+          <button type="button" class="btn btn--ghost" id="timerAdd">+30초</button>
+        </div>
+        <button type="button" class="btn btn--primary" id="nextSetBtn">다음 세트 시작</button>
+      </div>
+
+      <button type="button" class="btn btn--finish" id="finishBtn" disabled>오늘 운동 종료 &amp; 저장</button>
+    </section>
+
+    <details class="card fold progress">
+      <summary>진행 추이 <span class="progress__sub">Full ROM 총 개수 · 세션별</span></summary>
+      <div class="chart" id="chart"></div>
+      <p class="empty" id="chartEmpty" hidden>아직 기록이 없어요. 첫 세션을 저장하면 그래프가 시작돼요.</p>
+    </details>
+
+    <details class="card fold history">
+      <summary>운동 기록</summary>
+      <ul class="history__list" id="historyList"></ul>
+      <p class="empty" id="historyEmpty" hidden>아직 저장된 운동이 없어요.</p>
+    </details>
+
+  </main>
+
+  <div class="sheet" id="settingsSheet" aria-hidden="true">
+    <div class="sheet__backdrop" id="settingsBackdrop"></div>
+    <div class="sheet__panel">
+      <div class="sheet__head">
+        <h2>설정</h2>
+        <button type="button" class="iconbtn" id="settingsClose" aria-label="설정 닫기">✕</button>
+      </div>
+
+      <label class="settings__row">
+        <span>목표 세트 수</span>
+        <input type="number" id="cfgTargetSets" min="1" max="20">
+      </label>
+      <label class="settings__row">
+        <span>세트당 목표 횟수</span>
+        <input type="number" id="cfgTargetReps" min="1" max="30">
+      </label>
+      <label class="settings__row">
+        <span>세트 간 휴식(초)</span>
+        <input type="number" id="cfgRestSeconds" min="30" max="600" step="10">
+      </label>
+      <label class="settings__row settings__row--check">
+        <span>더 얇은 밴드 보유 중</span>
+        <input type="checkbox" id="cfgHasThinnerBand">
+      </label>
+      <label class="settings__row">
+        <span>보유한 검정 밴드 수</span>
+        <input type="number" id="cfgBlackOwned" min="0" max="10">
+      </label>
+      <label class="settings__row">
+        <span>보유한 초록 밴드 수</span>
+        <input type="number" id="cfgGreenOwned" min="0" max="10">
+      </label>
+
+      <hr>
+
+      <label class="settings__row settings__row--stack">
+        <span>Google Sheets 연동 URL (Apps Script, 선택)</span>
+        <input type="url" id="cfgSheetsUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      </label>
+      <p class="settings__hint">비워두면 기기 로컬에만 저장돼요. apps-script.gs 참고해 배포 후 URL을 붙여넣으면 세트 저장 시 자동으로 시트에 쌓여요.</p>
+
+      <hr>
+
+      <div class="settings__actions">
+        <button type="button" class="btn btn--ghost" id="exportBtn">데이터 내보내기 (JSON)</button>
+        <label class="btn btn--ghost btn--file">
+          데이터 가져오기
+          <input type="file" id="importInput" accept="application/json" hidden>
+        </label>
+        <button type="button" class="btn btn--danger" id="resetBtn">전체 초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
