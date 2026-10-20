@@ -23,12 +23,12 @@ window.CIVIC_DATA = {
       "items": [
         "도어 미러 어셈블리 좌 (부품 410,300 · 공임 56,650)"
       ],
-      "kind": "estimate",
+      "kind": "repair",
       "km": 256983,
-      "note": "견적서만 있고 시행 명세서는 없음.",
+      "note": "견적서 기준 금액. 시행 명세서는 없음.",
       "shop": "분당협력점",
       "shopType": "honda",
-      "title": "좌측 사이드미러 교환 견적"
+      "title": "좌측 사이드미러 교환"
     },
     {
       "id": "r20210426",
@@ -387,8 +387,8 @@ window.CIVIC_DATA = {
     {
       "id": "side-mirror",
       "since": "2026-03-12",
-      "status": "open",
-      "text": "좌측 사이드미러 교환 (견적 466,950원, 시행 기록 없음)"
+      "status": "done",
+      "text": "좌측 사이드미러 교환"
     }
   ],
   "settings": {
