@@ -17,7 +17,7 @@ window.CIVIC_DATA = {
       "title": "앞 로우암·스태빌라이저 링크·AT 압력 스위치 견적"
     },
     {
-      "id": "e20260312",
+      "id": "r20260312-mirror",
       "amount": 466950,
       "date": "2026-03-12",
       "items": [
@@ -299,15 +299,6 @@ window.CIVIC_DATA = {
       "note": "파워스티어링 벨트 포함"
     },
     {
-      "id": "engine-mount",
-      "intervalKm": 100000,
-      "intervalMonths": 0,
-      "lastDate": "2025-10-13",
-      "lastKm": 253485,
-      "name": "엔진마운트·토크로드",
-      "note": ""
-    },
-    {
       "id": "engine-oil",
       "intervalKm": 10000,
       "intervalMonths": 12,
@@ -315,15 +306,6 @@ window.CIVIC_DATA = {
       "lastKm": 256980,
       "name": "엔진오일·오일필터",
       "note": "SP 0W-20"
-    },
-    {
-      "id": "lower-arm",
-      "intervalKm": 100000,
-      "intervalMonths": 0,
-      "lastDate": "2025-10-13",
-      "lastKm": 253485,
-      "name": "앞 로우암·스태빌라이저 링크",
-      "note": "크랙 사유로 교환"
     },
     {
       "id": "ps-oil",
@@ -342,15 +324,6 @@ window.CIVIC_DATA = {
       "lastKm": 253485,
       "name": "점화플러그",
       "note": "2025-01-03 코일·플러그 교환 후 2025-10-13 플러그 4개 재교환"
-    },
-    {
-      "id": "water-pump",
-      "intervalKm": 100000,
-      "intervalMonths": 72,
-      "lastDate": "2025-10-13",
-      "lastKm": 253485,
-      "name": "워터펌프·서모스탯",
-      "note": ""
     },
     {
       "id": "tire",
@@ -387,15 +360,6 @@ window.CIVIC_DATA = {
       "lastKm": null,
       "name": "휠 얼라인먼트",
       "note": "타이어 교체(2026-03-27) 때 함께 했다고 보고 넣었다. 확인한 기록은 없다."
-    },
-    {
-      "id": "car-tax",
-      "intervalKm": 0,
-      "intervalMonths": 12,
-      "lastDate": "",
-      "lastKm": null,
-      "name": "자동차세 납부 (연납)",
-      "note": "1년에 한 번 납부. 마지막 납부일을 넣어야 알림이 뜬다."
     }
   ],
   "inspections": [

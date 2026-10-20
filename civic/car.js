@@ -117,7 +117,7 @@
       return M('tail');
     }
     if (x < -2.14) {
-      if (az < .09 && y > .86 && y < .95) return M('trim');
+      if (az < .09 && y > .86 && y < .95) return M('hub');
       if (y > .75 && y < .8 && az < .43) return M('hub');
     }
     return -1;

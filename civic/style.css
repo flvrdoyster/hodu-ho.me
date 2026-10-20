@@ -63,6 +63,7 @@ h2.sec{margin:0 0 6px;font-size:12px;font-weight:600;color:var(--muted);letter-s
 .panel h3{margin:0 0 4px;font-size:15px}
 .hint{color:var(--muted);font-size:12.5px;margin:0}
 .big{font-size:28px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
+.total{display:block;background:none;border:0;padding:0;color:inherit;font-family:inherit;text-align:left;cursor:pointer}
 .btn{appearance:none;padding:6px 12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;cursor:pointer}
 .btn:hover{border-color:var(--muted)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}

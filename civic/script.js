@@ -95,21 +95,16 @@
   function latestPolicy() { return D.policies.slice().sort((a, b) => (b.start || '').localeCompare(a.start || ''))[0] || null; }
   function ddayLabel(dd) { return dd > 0 ? 'D-' + dd : dd === 0 ? 'D-Day' : 'D+' + (-dd); }
   function mileageHTML(p) {
-    const limit = p.mileageStartKm + p.mileageLimitKm, left = limit - curKm();
-    return `<div class="meta" style="color:var(--ink2);margin-top:4px">마일리지 특약 최초 <span class="num">${fmt(p.mileageStartKm)}km</span>${p.mileageStartDate ? ` (${esc(p.mileageStartDate)})` : ''} · 한도 <span class="num">${fmt(limit)}km</span>까지 <span class="num">${fmt(left)}km</span> 남음</div>
-      <div class="hint" style="margin-top:4px">만기 후 최종 주행거리를 등록해야 정산돼요.</div>`;
+    const left = p.mileageStartKm + p.mileageLimitKm - curKm();
+    return `<div class="meta" style="color:var(--ink2);margin-top:4px">마일리지 특약 <span class="num">${fmt(left)}km</span> 남음</div>`;
   }
   function policyHTML() {
     const p = latestPolicy();
     if (!p) return '<p class="hint">가입 기록이 없어요.</p>';
     const dd = p.end ? daysBetween(today(), pd(p.end)) : null;
     return `${dd != null ? `<div class="big num">${ddayLabel(dd)}</div>` : ''}<div class="meta" style="color:var(--ink2)">${esc(p.insurer)} · 만기 <span class="num">${esc(p.end || '-')}</span></div>
-      <div class="meta" style="color:var(--muted);margin-top:4px">보험기간 <span class="num">${esc(p.start || '-')} ~ ${esc(p.end || '-')}</span></div>
       ${p.premium ? `<div class="meta" style="color:var(--ink2);margin-top:4px">보험료 <span class="num">${won(p.premium)}</span>${p.payMethod ? ' · ' + esc(p.payMethod) : ''}</div>` : ''}
-      ${p.coverage && p.coverage.length ? `<div class="meta" style="color:var(--ink2);margin-top:4px">${p.coverage.map(esc).join(' · ')}</div>` : ''}
-      ${p.terms && p.terms.length ? `<div class="meta" style="color:var(--muted);margin-top:4px">특약 ${p.terms.map(esc).join(' · ')}</div>` : ''}
-      ${p.mileageStartKm && p.mileageLimitKm ? mileageHTML(p) : ''}
-      ${p.note ? `<div class="hint" style="margin-top:4px">${esc(p.note)}</div>` : ''}`;
+      ${p.mileageStartKm && p.mileageLimitKm ? mileageHTML(p) : ''}`;
   }
 
   function remainText(p, c) {
@@ -148,7 +143,7 @@
         ${attn.length ? attn.map(partRowShort).join('') : `<div class="empty"><b>임박한 항목이 없어요</b>${D.parts.length ? '모든 항목이 주기 안에 있어요.' : '등록된 교체 항목이 없어요.'}</div>`}
       </section>
       <section><h2 class="sec">최근 정비 <button class="btn ghost" data-act="tab" data-v="log">전체 보기</button></h2>
-        ${recent.length ? recent.map(r => `<div class="row ${r.kind === 'estimate' ? 'est' : ''}"><div class="main"><div class="ttl">${esc(r.title)}</div><div class="meta"><span class="date">${esc(r.date)}</span> · ${esc(r.shop)} · <span class="num">${fmt(r.km)}km</span></div></div><div class="end">${kindPill(r.kind)}<div class="num" style="margin-top:4px">${won(r.amount)}</div></div></div>`).join('') : '<p class="hint">정비 기록이 없어요.</p>'}
+        ${recent.length ? recent.map(r => `<div class="row ${r.kind === 'estimate' ? 'est' : ''}"><div class="main"><div class="ttl">${esc(r.title)}</div><div class="meta"><span class="date">${esc(r.date)}</span> · ${esc(r.shop)} · <span class="num">${fmt(r.km)}km</span></div></div><div class="end">${kindPill(r.kind)}</div></div>`).join('') : '<p class="hint">정비 기록이 없어요.</p>'}
       </section>
     </div>
     <div class="stack">
@@ -158,7 +153,7 @@
         ${issues.length ? issues.map(i => `<div class="row"><div class="main"><div class="ttl">${esc(i.text)}</div><div class="meta"><span class="date">${esc(i.since || '')}</span></div></div>${ed(`<div class="end"><button class="btn ghost" data-act="issueDone" data-id="${esc(i.id)}">완료</button></div>`)}</div>`).join('') : '<p class="hint">열린 이슈가 없어요.</p>'}
       </section>
       <section><h2 class="sec">누적 정비비</h2>
-        <div class="big num">${won(total)}</div>
+        <button class="big num total" data-act="total" data-exact="${won(total)}" data-round="약 ${Math.round(total / 1e6) * 100}만원" aria-label="누적 정비비, 누르면 실제 금액 표시">약 ${Math.round(total / 1e6) * 100}만원</button>
         <div class="meta" style="color:var(--ink2)">자비 정비 ${repairs.length}건${dates.length ? ` · <span class="num">${dates[0].slice(0, 7)} ~ ${dates[dates.length - 1].slice(0, 7)}</span>` : ''}</div>
         <div class="hint" style="margin-top:4px">보험 수리와 견적은 제외</div>
       </section>
@@ -243,6 +238,8 @@
       if (seen[k]) return;
       seen[k] = 1; pts.push({ date: r.date, km: r.km });
     });
+    const st = D.settings;
+    if (st.kmDate && st.currentKm && !seen[st.kmDate + '|' + st.currentKm]) pts.push({ date: st.kmDate, km: st.currentKm });
     pts.sort((a, b) => a.date.localeCompare(b.date));
     return { list, shopList, pts };
   }
@@ -414,7 +411,7 @@
     }
     delete body.id;
     upsert(F.col, E.id, body);
-    if (E.type === 'record' && body.kind !== 'estimate' && body.km > D.settings.currentKm) D.settings.currentKm = body.km;
+    if (E.type === 'record' && body.kind !== 'estimate' && body.km > D.settings.currentKm) { D.settings.currentKm = body.km; D.settings.kmDate = body.date; }
     if (!saveData()) return;
     S.editing = null; toast('저장됨'); render();
   }
@@ -453,6 +450,10 @@
   }
 
   const H = {
+    total(b) {
+      const exact = b.textContent === b.dataset.exact;
+      b.textContent = exact ? b.dataset.round : b.dataset.exact;
+    },
     tab(b) {
       S.tab = b.dataset.v; S.editing = null;
       try { history.replaceState(null, '', '#' + S.tab); } catch (e) { /* 무시 */ }
@@ -465,7 +466,7 @@
     saveKm() {
       const v = Number($('#kmInput').value);
       if (!(v >= 0)) return;
-      D.settings.currentKm = v;
+      D.settings.currentKm = v; D.settings.kmDate = todayStr();
       if (!saveData()) return;
       S.kmEdit = false; toast('주행거리 저장됨'); render();
     },
