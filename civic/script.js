@@ -165,7 +165,7 @@
     if (!a) return '';
     if (!WX.days) return `<p class="hint">${WX.fail ? '날씨를 불러오지 못했어요.' : '날씨를 불러오는 중이에요.'}</p>`;
     const DOW = ['일', '월', '화', '수', '목', '금', '토'];
-    return `<div class="wx" role="list" aria-label="${esc(a.name)} 7일 예보">${WX.days.map((x, i) => `<div class="wd" role="listitem"><span class="dw">${i ? DOW[pd(x.date).getUTCDay()] : '오늘'}</span>${wxIcon(wxKey(x.code))}<span class="sr">${WXK[wxKey(x.code)]}</span><span class="num"><b>${Math.round(x.tmax)}°</b> ${Math.round(x.tmin)}°</span>${x.rain >= 1 ? `<span class="num rn">${Math.round(x.rain)}mm</span>` : ''}</div>`).join('')}</div>`;
+    return `<div class="wx" role="list" aria-label="${esc(a.name)} 7일 예보">${WX.days.map((x, i) => `<div class="wd" role="listitem"><span class="dw">${i ? DOW[pd(x.date).getUTCDay()] : '오늘'}</span>${wxIcon(wxKey(x.code))}<span class="sr">${WXK[wxKey(x.code)]}</span><span class="num tp"><b>${Math.round(x.tmax)}°</b><i>${Math.round(x.tmin)}°</i></span>${x.rain >= 1 ? `<span class="num rn">${Math.round(x.rain)}mm</span>` : ''}</div>`).join('')}</div>`;
   }
 
   function tile(label, body, act) {
