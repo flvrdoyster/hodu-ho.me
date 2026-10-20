@@ -8,10 +8,10 @@
   const WRITE = new Set(['editKm', 'cancelKm', 'saveKm', 'new', 'edit', 'save', 'cancel', 'del', 'replaced', 'issueDone',
     'backup', 'restore', 'csvExport', 'csvImport', 'csvApply', 'csvClear', 'saveVehicle']);
   const ed = html => EDIT ? html : '';
-  const COLS = ['records', 'parts', 'inspections', 'issues'];
+  const COLS = ['records', 'parts', 'inspections', 'issues', 'policies'];
 
   function emptyData() {
-    return { records: [], parts: [], inspections: [], issues: [], settings: { currentKm: 0, plate: '', model: '' } };
+    return { records: [], parts: [], inspections: [], issues: [], policies: [], settings: { currentKm: 0, plate: '', model: '' } };
   }
   function normalize(raw) {
     const d = emptyData();
@@ -92,12 +92,31 @@
   }
 
   function latestInsp() { return D.inspections.slice().sort(byDateDesc)[0] || null; }
+  function latestPolicy() { return D.policies.slice().sort((a, b) => (b.start || '').localeCompare(a.start || ''))[0] || null; }
+  function ddayLabel(dd) { return dd > 0 ? 'D-' + dd : dd === 0 ? 'D-Day' : 'D+' + (-dd); }
+  function mileageHTML(p) {
+    const limit = p.mileageStartKm + p.mileageLimitKm, left = limit - curKm();
+    return `<div class="meta" style="color:var(--ink2);margin-top:4px">마일리지 특약 최초 <span class="num">${fmt(p.mileageStartKm)}km</span>${p.mileageStartDate ? ` (${esc(p.mileageStartDate)})` : ''} · 한도 <span class="num">${fmt(limit)}km</span>까지 <span class="num">${fmt(left)}km</span> 남음</div>
+      <div class="hint" style="margin-top:4px">만기 후 최종 주행거리를 등록해야 정산돼요.</div>`;
+  }
+  function policyHTML() {
+    const p = latestPolicy();
+    if (!p) return '<p class="hint">가입 기록이 없어요.</p>';
+    const dd = p.end ? daysBetween(today(), pd(p.end)) : null;
+    return `${dd != null ? `<div class="big num">${ddayLabel(dd)}</div>` : ''}<div class="meta" style="color:var(--ink2)">${esc(p.insurer)} · 만기 <span class="num">${esc(p.end || '-')}</span></div>
+      <div class="meta" style="color:var(--muted);margin-top:4px">보험기간 <span class="num">${esc(p.start || '-')} ~ ${esc(p.end || '-')}</span></div>
+      ${p.premium ? `<div class="meta" style="color:var(--ink2);margin-top:4px">보험료 <span class="num">${won(p.premium)}</span>${p.payMethod ? ' · ' + esc(p.payMethod) : ''}</div>` : ''}
+      ${p.coverage && p.coverage.length ? `<div class="meta" style="color:var(--ink2);margin-top:4px">${p.coverage.map(esc).join(' · ')}</div>` : ''}
+      ${p.terms && p.terms.length ? `<div class="meta" style="color:var(--muted);margin-top:4px">특약 ${p.terms.map(esc).join(' · ')}</div>` : ''}
+      ${p.mileageStartKm && p.mileageLimitKm ? mileageHTML(p) : ''}
+      ${p.note ? `<div class="hint" style="margin-top:4px">${esc(p.note)}</div>` : ''}`;
+  }
 
   function remainText(p, c) {
     const a = [];
     if (c.kmLeft != null) a.push(c.kmLeft >= 0 ? `<span class="num">${fmt(c.kmLeft)}km</span> 남음` : `<span class="num">${fmt(-c.kmLeft)}km</span> 초과`);
     if (c.daysLeft != null) a.push(c.daysLeft >= 0 ? `<span class="num">${c.due}</span> 까지 (D-${c.daysLeft})` : `기한 <span class="num">${c.due}</span> 지남 (D+${-c.daysLeft})`);
-    return a.join(' · ') || '주기 미설정';
+    return a.join(' · ') || (p.intervalKm > 0 || p.intervalMonths > 0 ? '마지막 교체 기록 없음' : '주기 미설정');
   }
   function partRowShort(x) {
     const p = x.p, c = x.c;
@@ -113,7 +132,7 @@
       const dd = daysBetween(t, pd(li.nextDate));
       const w = inspectionWindow(li.nextDate);
       const inWin = todayStr() >= w.start && todayStr() <= w.end;
-      const label = dd > 0 ? 'D-' + dd : dd === 0 ? 'D-Day' : 'D+' + (-dd);
+      const label = ddayLabel(dd);
       insp = `<div class="big num">${label}</div><div class="meta" style="color:var(--ink2)">다음 종합검사일 <span class="num">${esc(li.nextDate)}</span></div>
       <div class="meta" style="color:var(--ink2);margin-top:4px">검사 가능 기간 <span class="num">${w.start} ~ ${w.end}</span> ${inWin ? pill('soon').replace('임박', '검사 기간') : ''}</div>
       <div class="meta" style="color:var(--muted);margin-top:4px">마지막 검사 <span class="num">${esc(li.date)}</span> · ${esc(li.result || '')}</div>`;
@@ -134,6 +153,7 @@
     </div>
     <div class="stack">
       <section class="panel"><h2 class="sec">종합검사</h2>${insp}</section>
+      <section class="panel"><h2 class="sec">자동차보험</h2>${policyHTML()}</section>
       <section><h2 class="sec">열린 이슈 ${ed('<button class="btn ghost" data-act="new" data-type="issue">추가</button>')}</h2>
         ${issues.length ? issues.map(i => `<div class="row"><div class="main"><div class="ttl">${esc(i.text)}</div><div class="meta"><span class="date">${esc(i.since || '')}</span></div></div>${ed(`<div class="end"><button class="btn ghost" data-act="issueDone" data-id="${esc(i.id)}">완료</button></div>`)}</div>`).join('') : '<p class="hint">열린 이슈가 없어요.</p>'}
       </section>
@@ -181,12 +201,15 @@
   function logHTML() {
     const chip = (k, v, l, cur) => `<button class="chip" aria-pressed="${cur === v}" data-act="${k}" data-v="${v}">${l}</button>`;
     const insp = D.inspections.slice().sort(byDateDesc);
+    const pols = D.policies.slice().sort((a, b) => (b.start || '').localeCompare(a.start || ''));
     return `<div class="bar-row"><input id="q" class="search" type="search" placeholder="제목, 정비소, 내역 검색" value="${esc(S.q)}" aria-label="정비 이력 검색">${ed('<button class="btn primary" data-act="new" data-type="record">정비 추가</button>')}</div>
   <div class="chips" role="group" aria-label="구분">${chip('filter', 'all', '전체', S.filter)}${chip('filter', 'repair', '정비', S.filter)}${chip('filter', 'insurance', '보험', S.filter)}${chip('filter', 'estimate', '견적', S.filter)}</div>
   <div class="chips" role="group" aria-label="정비소 유형">${chip('shopf', 'all', '모든 정비소', S.shopf)}${chip('shopf', 'honda', '혼다 공식', S.shopf)}${chip('shopf', 'general', '일반', S.shopf)}</div>
   <div id="loglist">${logListHTML()}</div>
   <section style="margin-top:32px"><h2 class="sec">종합검사 ${ed('<button class="btn ghost" data-act="new" data-type="insp">검사 추가</button>')}</h2>
-  ${insp.length ? insp.map(i => `<div class="row"><div class="main"><div class="ttl">${esc(i.result || '')} <span class="date">${esc(i.date)}</span></div><div class="meta"><span class="num">${fmt(i.km)}km</span> · 다음 검사일 <span class="num">${esc(i.nextDate || '-')}</span>${i.note ? '<br>' + esc(i.note) : ''}</div></div>${ed(`<div class="end"><button class="btn ghost" data-act="edit" data-type="insp" data-id="${esc(i.id)}">수정</button></div>`)}</div>`).join('') : '<p class="hint">검사 기록이 없어요.</p>'}</section>`;
+  ${insp.length ? insp.map(i => `<div class="row"><div class="main"><div class="ttl">${esc(i.result || '')} <span class="date">${esc(i.date)}</span></div><div class="meta"><span class="num">${fmt(i.km)}km</span> · 다음 검사일 <span class="num">${esc(i.nextDate || '-')}</span>${i.note ? '<br>' + esc(i.note) : ''}</div></div>${ed(`<div class="end"><button class="btn ghost" data-act="edit" data-type="insp" data-id="${esc(i.id)}">수정</button></div>`)}</div>`).join('') : '<p class="hint">검사 기록이 없어요.</p>'}</section>
+  <section style="margin-top:32px"><h2 class="sec">자동차보험 ${ed('<button class="btn ghost" data-act="new" data-type="policy">가입 추가</button>')}</h2>
+  ${pols.length ? pols.map(p => `<div class="row"><div class="main"><div class="ttl">${esc(p.insurer)} <span class="date">${esc(p.start || '')} ~ ${esc(p.end || '')}</span></div><div class="meta">${(p.coverage || []).map(esc).join(' · ')}${p.note ? '<br>' + esc(p.note) : ''}</div></div>${ed(`<div class="end"><button class="btn ghost" data-act="edit" data-type="policy" data-id="${esc(p.id)}">수정</button></div>`)}</div>`).join('') : '<p class="hint">가입 기록이 없어요.</p>'}</section>`;
   }
 
   function niceStep(v) {
@@ -307,7 +330,7 @@
     const s = D.settings, p = S.pending;
     return `<p class="notice">데이터는 이 브라우저에만 저장돼요. 기기를 바꾸거나 브라우저 데이터를 지우기 전에 백업 파일을 받아 두세요.</p>
   <div class="grid"><div class="stack">
-   <section class="panel"><h3>백업</h3><p class="hint">정비 이력, 교체 주기, 종합검사, 이슈, 설정 전체를 JSON 파일로 저장하거나 복원해요. 복원하면 지금 데이터가 모두 바뀌어요.</p>
+   <section class="panel"><h3>백업</h3><p class="hint">정비 이력, 교체 주기, 종합검사, 자동차보험, 이슈, 설정 전체를 JSON 파일로 저장하거나 복원해요. 복원하면 지금 데이터가 모두 바뀌어요.</p>
      <div class="actions" style="margin-top:12px"><button class="btn primary" data-act="backup">백업 받기</button><button class="btn" data-act="restore">백업 불러오기</button></div></section>
    <section class="panel"><h3>구글 시트</h3><p class="hint">정비 이력을 CSV로 받아 구글 시트의 파일 › 가져오기로 열어요. 시트에서 고친 CSV를 다시 불러오면 같은 id의 기록은 시트 값으로 덮어써요. 교체 주기와 검사 기록은 포함되지 않아요.</p>
      <div class="actions" style="margin-top:12px"><button class="btn primary" data-act="csvExport" ${D.records.length ? '' : 'disabled'}>CSV 내보내기</button><button class="btn" data-act="csvImport">CSV 불러오기</button></div>
@@ -335,6 +358,12 @@
     insp: { col: 'inspections', title: '종합검사', fields: [
       { k: 'date', l: '검사일', t: 'date', req: 1 }, { k: 'km', l: '주행거리(km)', t: 'num' }, { k: 'result', l: '결과', t: 'text' },
       { k: 'nextDate', l: '다음 검사일', t: 'date' }, { k: 'note', l: '메모', t: 'area', w: 1 }] },
+    policy: { col: 'policies', title: '자동차보험', fields: [
+      { k: 'insurer', l: '보험사', t: 'text', req: 1 }, { k: 'start', l: '보험 시작일', t: 'date', req: 1 }, { k: 'end', l: '보험 만기일', t: 'date', req: 1 },
+      { k: 'premium', l: '보험료(원)', t: 'num' }, { k: 'payMethod', l: '납입방법', t: 'text' },
+      { k: 'coverage', l: '가입담보 (줄바꿈으로 구분)', t: 'lines', w: 1 }, { k: 'terms', l: '특별약관 (줄바꿈으로 구분)', t: 'lines', w: 1 },
+      { k: 'mileageStartKm', l: '마일리지 최초 주행거리(km)', t: 'num' }, { k: 'mileageStartDate', l: '최초 주행거리 확인일', t: 'date' },
+      { k: 'mileageLimitKm', l: '마일리지 약정 상한(km)', t: 'num' }, { k: 'note', l: '메모', t: 'area', w: 1 }] },
     issue: { col: 'issues', title: '이슈', fields: [
       { k: 'text', l: '내용', t: 'area', req: 1, w: 1 }, { k: 'since', l: '발견일', t: 'date' }] },
   };

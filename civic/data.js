@@ -351,6 +351,51 @@ window.CIVIC_DATA = {
       "lastKm": 253485,
       "name": "워터펌프·서모스탯",
       "note": ""
+    },
+    {
+      "id": "tire",
+      "intervalKm": 50000,
+      "intervalMonths": 60,
+      "lastDate": "2026-03-27",
+      "lastKm": null,
+      "name": "타이어 (4본)",
+      "note": "한국타이어 Kinergy ST AS 205/55R16. 장착 당시 주행거리를 몰라 기간 기준으로만 계산한다. 트레드와 제조 연도 둘 다 본다."
+    },
+    {
+      "id": "brake-pad",
+      "intervalKm": 30000,
+      "intervalMonths": 24,
+      "lastDate": "",
+      "lastKm": null,
+      "name": "브레이크 패드·디스크",
+      "note": "패드 점검 주기. 디스크는 패드 2~3회마다 같이 본다."
+    },
+    {
+      "id": "wiper",
+      "intervalKm": 0,
+      "intervalMonths": 12,
+      "lastDate": "",
+      "lastKm": null,
+      "name": "와이퍼 블레이드",
+      "note": ""
+    },
+    {
+      "id": "alignment",
+      "intervalKm": 20000,
+      "intervalMonths": 12,
+      "lastDate": "2026-03-27",
+      "lastKm": null,
+      "name": "휠 얼라인먼트",
+      "note": "타이어 교체(2026-03-27) 때 함께 했다고 보고 넣었다. 확인한 기록은 없다."
+    },
+    {
+      "id": "car-tax",
+      "intervalKm": 0,
+      "intervalMonths": 12,
+      "lastDate": "",
+      "lastKm": null,
+      "name": "자동차세 납부 (연납)",
+      "note": "1년에 한 번 납부. 마지막 납부일을 넣어야 알림이 뜬다."
     }
   ],
   "inspections": [
@@ -391,10 +436,41 @@ window.CIVIC_DATA = {
       "text": "좌측 사이드미러 교환"
     }
   ],
+  "policies": [
+    {
+      "id": "p20260711",
+      "insurer": "AXA",
+      "start": "2026-07-11",
+      "end": "2027-07-11",
+      "coverage": [
+        "대인Ⅰ",
+        "대인Ⅱ",
+        "대물",
+        "자손",
+        "무보험차상해",
+        "자차"
+      ],
+      "premium": 957370,
+      "payMethod": "일시납",
+      "terms": [
+        "기명피보험자 1인한정운전",
+        "긴급출동서비스확장(50km)",
+        "선할인마일리지(8,001~9,000km)",
+        "블랙박스",
+        "차량단독사고보장",
+        "대물배상 확대",
+        "보험대차운전중 사고보상추가"
+      ],
+      "mileageStartKm": 259517,
+      "mileageStartDate": "2026-07-22",
+      "mileageLimitKm": 9000,
+      "note": "긴급출동 이용 0회. 물적할증 기준금액 200만원."
+    }
+  ],
   "settings": {
     "plate": "31버7847",
     "model": "혼다 시빅 1.8 · FD1 · 2008년식",
-    "currentKm": 256983,
-    "kmDate": "2026-03-12"
+    "currentKm": 259517,
+    "kmDate": "2026-07-22"
   }
 };
