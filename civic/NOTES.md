@@ -53,9 +53,9 @@
 - `records`: date, km, shop, shopType(honda|general), kind(repair|insurance|estimate), title, items[], amount, note
 - `parts`: name, intervalKm, intervalMonths, lastDate, lastKm, note
 - `inspections`: date, km, result, nextDate, note
-- `issues`: text, status(open|done), since
+- `issues`: text, status(open|done), since, doneDate
 - `policies`: insurer, start, end, premium, payMethod, coverage[], terms[], mileageStartKm, mileageStartDate, mileageLimitKm, note (자동차보험 가입 기록. 요약 탭에는 만기 D-day, 보험사·만기일, 마일리지 특약 남은 거리만 보이고 보험료·담보·메모는 정비 이력 탭에 있다. 특약 목록은 데이터에만 있다)
-- `settings`: plate, model, currentKm, kmDate, area(날씨 예보 지역 이름·위경도, 시 단위 좌표만 넣는다). 편집을 켜면 주행거리 수정이나 더 큰 주행거리의 정비 기록 저장 때 kmDate도 함께 바뀐다.
+- `settings`: plate, model, vin, currentKm, kmDate, area(날씨 예보 지역 이름·위경도, 시 단위 좌표만 넣는다). 편집을 켜면 주행거리 수정이나 더 큰 주행거리의 정비 기록 저장 때 kmDate도 함께 바뀐다.
 
 ## 데이터 주의점
 
@@ -65,7 +65,8 @@
 - 2026-03-12 좌측 사이드미러(466,950원)는 시행했으나 명세서가 없어 견적서 금액과 견적일로 정비 기록(`r20260312-mirror`)에 넣었다. 같은 날 스풀밸브 명세서의 "사이드미러 교환 예정" 문구는 원문이라 그대로 둔다.
 - 2025-07-02 견적(961,290원)은 2025-10-13 정비에 포함돼 있어 견적으로 남긴다. 정비로 바꾸면 이중 집계된다.
 - 2025-12-26 종합검사: 적합이지만 헤드·오일팬·엔진 앞 케이스 누유(심함) 보완 권고, 자기진단 센서 점검은 "진단불가(통신 이상)".
-- 주민등록번호·차대번호는 넣지 않는다. 레포와 사이트가 공개다.
+- 주민등록번호는 넣지 않는다. 레포와 사이트가 공개다. 차대번호(`settings.vin`)는 차량번호처럼 차 밖에서도 보이는 정보라 넣는다(2026-10-20 결정).
+- 에어백 리콜: 2026-10-20 자동차리콜센터(car.go.kr) 차대번호 조회에서 두 건 모두 "리콜완료"였다. "[혼다코리아] CIVIC 등 3차종 에어백 관련 리콜"(개시 2016-06-07, 인플레이터 내부 압력 이상)과 "[혼다코리아] ACCORD 외 4차종 에어백 관련 리콜"(개시 2016-08-16, 조수석 인플레이터)이다. 조치 여부는 제작사의 분기 보고 기준이고, 실제 작업 이력은 혼다 서비스센터에서 확인할 수 있다. 무상점검수리 내역은 없었다.
 - 타이어 장착일(2026-03-27)과 모델은 T맵 all my T 화면 기준이다. 장착 시 주행거리·금액·정비소는 없어 정비 이력에는 넣지 않았다.
 - 보험 가입 기록에는 피보험자 이름, 주민등록번호, 운전자 연령 범위(생년월일이 드러남)를 넣지 않는다. 특별약관 중 연령 한정 특약은 연령대가 드러나 넣지 않았다. 이전 가입 이력은 문서가 없어 현재 계약(2026-07-11 ~ 2027-07-11)만 있다. 2024-04 자차 청구는 교보AXA였다.
 

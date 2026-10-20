@@ -396,8 +396,9 @@ window.CIVIC_DATA = {
     {
       "id": "recall-airbag",
       "since": "2026-10-20",
-      "status": "open",
-      "text": "에어백(다카타 인플레이터) 리콜 대상·조치 여부 확인 (자동차리콜센터 car.go.kr, 차대번호 조회)"
+      "status": "done",
+      "doneDate": "2026-10-20",
+      "text": "에어백 리콜 2건(2016-06 CIVIC 등 3차종, 2016-08 ACCORD 외 4차종 조수석) 리콜완료 확인"
     },
     {
       "id": "side-mirror",
@@ -440,6 +441,7 @@ window.CIVIC_DATA = {
   "settings": {
     "plate": "31버7847",
     "model": "혼다 시빅 1.8 · FD1 · 2008년식",
+    "vin": "JHMFD16208S204802",
     "area": { "name": "성남", "lat": 37.42, "lon": 127.13 },
     "currentKm": 259517,
     "kmDate": "2026-07-22"
