@@ -118,7 +118,33 @@
   }
 
   const WX = { days: null, fail: false };
-  const WCODE = c => c >= 95 ? '뇌우' : (c >= 71 && c <= 77) || c === 85 || c === 86 ? '눈' : c >= 51 ? '비' : c >= 45 ? '안개' : c >= 3 ? '흐림' : c >= 1 ? '구름' : '맑음';
+  const WXI = {
+    clear: ['.......yy.......', '.......yy.......', '..yy...yy...yy..', '..yy........yy..', '......kkkk......', '.....kyyyyk.....', '....kyyyyyyk....', 'yyy.kyyyyyok.yyy', 'yyy.kyyyyook.yyy', '....kyyyoook....', '.....kyoook.....', '......kkkk......', '..yy........yy..', '..yy...yy...yy..', '.......yy.......', '.......yy.......'],
+    partly: ['................', '...kkk..........', '..kyyyk.........', '.kyyyyyk........', '.kyyyyok........', '.kyyyook........', '..kyookkkkk.....', '...kkkkwwwwk....', '....kkwwwwwwk...', '...kwwwwwwwwwkk.', '..kwwwwwwwwwwwwk', '..kwwwwwwwwwwwgk', '..kggggggggggggk', '...kkkkkkkkkkkk.', '................', '................'],
+    cloudy: ['................', '................', '.....kkkk.......', '....kGGGGk......', '..kkGGGGGGk.....', '.kGGGGGGGGGkk...', 'kGGGGGGkkkkGGk..', 'kGGGGGkwwwwkHk..', 'kHHHkkwwwwwwkk..', '.kkkwwwwwwwwwkk.', '..kwwwwwwwwwwwwk', '..kwwwwwwwwwwwgk', '..kggggggggggggk', '...kkkkkkkkkkkk.', '................', '................'],
+    fog: ['................', '................', '................', '..fffffffffff...', '...FFFFFFFFF....', '................', '................', 'fffffffff.ffffff', '.FFFFFFF...FFFF.', '................', '................', '...ffffffffffff.', '....FFFFFFFFFF..', '................', '................', '................'],
+    rain: ['................', '......kkkk......', '.....kGGGGk.....', '...kkGGGGGGk....', '..kGGGGGGGGGkk..', '.kGGGGGGGGGGGGk.', '.kGGGGGGGGGGGHk.', '.kHHHHHHHHHHHHk.', '..kkkkkkkkkkkk..', '................', '...b...b...b....', '..b...b...b.....', '................', '.....b...b...b..', '....b...b...b...', '................'],
+    snow: ['................', '......kkkk......', '.....kwwwwk.....', '...kkwwwwwwk....', '..kwwwwwwwwwkk..', '.kwwwwwwwwwwwwk.', '.kwwwwwwwwwwwgk.', '.kggggggggggggk.', '..kkkkkkkkkkkk..', '........S.......', '...S...SsS......', '..SsS...S...S...', '...S..S....SsS..', '.....SsS....S...', '......S.........', '................'],
+    storm: ['................', '......kkkk......', '.....kHHHHk.....', '...kkHHHHHHk....', '..kHHHHHHHHHkk..', '.kHHHHHHHHHHHHk.', '.kHHHHHHHHHHHDk.', '.kDDDDDDDDDDDDk.', '..kkkkkkkkkkkk..', '........yy......', '.......yy.......', '......yyyy......', '........yy......', '.......yy.......', '.......y........', '................'],
+  };
+  const WXC = { k: '#1b2026', w: '#f6f8fa', g: '#c3cbd1', G: '#c3cbd1', H: '#869199', D: '#5f6b74', y: '#f6c344', o: '#e09a1f', b: '#5598e7', s: '#f6f8fa', S: '#c3cbd1', f: '#c3cbd1', F: '#869199' };
+  const WXK = { clear: '맑음', partly: '구름', cloudy: '흐림', fog: '안개', rain: '비', snow: '눈', storm: '뇌우' };
+  const wxKey = c => c >= 95 ? 'storm' : (c >= 71 && c <= 77) || c === 85 || c === 86 ? 'snow' : c >= 51 ? 'rain' : c >= 45 ? 'fog' : c >= 3 ? 'cloudy' : c >= 1 ? 'partly' : 'clear';
+  const WXSVG = {};
+  function wxIcon(k) {
+    if (WXSVG[k]) return WXSVG[k];
+    let r = '';
+    WXI[k].forEach((row, y) => {
+      for (let x = 0; x < row.length;) {
+        const c = row[x];
+        let n = 1;
+        while (row[x + n] === c) n++;
+        if (c !== '.') r += `<rect x="${x}" y="${y}" width="${n}" height="1" fill="${WXC[c]}"/>`;
+        x += n;
+      }
+    });
+    return (WXSVG[k] = `<svg class="wi" viewBox="0 0 16 16" width="32" height="32" shape-rendering="crispEdges" aria-hidden="true">${r}</svg>`);
+  }
   function loadWeather() {
     const a = D.settings.area;
     if (!a || !window.fetch) return;
@@ -139,7 +165,7 @@
     if (!a) return '';
     if (!WX.days) return `<p class="hint">${WX.fail ? '날씨를 불러오지 못했어요.' : '날씨를 불러오는 중이에요.'}</p>`;
     const DOW = ['일', '월', '화', '수', '목', '금', '토'];
-    return `<div class="wx" role="list" aria-label="${esc(a.name)} 7일 예보">${WX.days.map((x, i) => `<div class="wd" role="listitem"><span class="dw">${i ? DOW[pd(x.date).getUTCDay()] : '오늘'}</span><span class="wc">${WCODE(x.code)}</span><span class="num"><b>${Math.round(x.tmax)}°</b> ${Math.round(x.tmin)}°</span>${x.rain >= 1 ? `<span class="num rn">${Math.round(x.rain)}mm</span>` : ''}</div>`).join('')}</div>`;
+    return `<div class="wx" role="list" aria-label="${esc(a.name)} 7일 예보">${WX.days.map((x, i) => `<div class="wd" role="listitem"><span class="dw">${i ? DOW[pd(x.date).getUTCDay()] : '오늘'}</span>${wxIcon(wxKey(x.code))}<span class="sr">${WXK[wxKey(x.code)]}</span><span class="num"><b>${Math.round(x.tmax)}°</b> ${Math.round(x.tmin)}°</span>${x.rain >= 1 ? `<span class="num rn">${Math.round(x.rain)}mm</span>` : ''}</div>`).join('')}</div>`;
   }
 
   function tile(label, body, act) {
