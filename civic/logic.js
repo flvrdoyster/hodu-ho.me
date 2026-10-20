@@ -123,8 +123,62 @@
     return Array.from(map.values());
   }
 
+  const SEASON = {
+    1: [['겨울', '워셔액·배터리', '영하에서는 겨울용 워셔액인지, 아침 시동이 약하지 않은지 봐요.'], ['기한', '자동차세 연납 신청', '1월에 신청하면 할인이 가장 커요.']],
+    2: [['겨울', '워셔액·배터리', '영하에서는 겨울용 워셔액인지, 아침 시동이 약하지 않은지 봐요.']],
+    3: [['봄', '하부 세차', '겨울 동안 묻은 염화칼슘을 씻어 내요. 오래된 차일수록 부식이 빨라요.']],
+    4: [['봄', '하부 세차', '겨울 동안 묻은 염화칼슘을 씻어 내요. 오래된 차일수록 부식이 빨라요.']],
+    5: [['여름 준비', '에어컨 작동 확인', '더워지기 전에 찬바람이 제대로 나오는지 봐요. 2023년에 컴프레서 클러치를 고쳤어요.']],
+    6: [['장마', '와이퍼·타이어 홈', '장마 전에 와이퍼가 줄무늬 없이 닦이는지, 타이어 홈이 충분한지 봐요.']],
+    7: [['여름', '냉각수·실내 고온', '냉각수 수위를 보고, 라이터·스프레이·보조배터리는 차에 두지 않아요.']],
+    8: [['여름', '냉각수·실내 고온', '냉각수 수위를 보고, 라이터·스프레이·보조배터리는 차에 두지 않아요.']],
+    9: [['가을', '블랙박스 녹화 확인', '메모리카드는 1~2년이면 수명이 다해요. 최근 영상이 남는지 봐요.']],
+    10: [['겨울 준비', '배터리·워셔액·냉각수', '추워지기 전에 배터리 상태, 겨울용 워셔액, 냉각수 양을 챙겨요.']],
+    11: [['겨울 준비', '배터리·워셔액·냉각수', '추워지기 전에 배터리 상태, 겨울용 워셔액, 냉각수 양을 챙겨요.']],
+    12: [['겨울', '워셔액·배터리', '영하에서는 겨울용 워셔액인지, 아침 시동이 약하지 않은지 봐요.']],
+  };
+
+  function weatherTips(days) {
+    const out = [];
+    if (!days || !days.length) return out;
+    const md = s => Number(s.slice(5, 7)) + '/' + Number(s.slice(8, 10));
+    const most = (k, sign) => days.reduce((a, b) => (sign * (b[k] - a[k]) > 0 ? b : a));
+    const snow = days.find(x => x.snow > 0), cold = most('tmin', -1), wet = most('rain', 1), hot = most('tmax', 1);
+    let d;
+    if ((d = snow)) out.push({ lv: 'over', tag: '날씨', t: md(d.date) + ' 눈 예보', d: '전날 밤 와이퍼를 세워 두고, 아침에 유리 성에를 다 녹인 뒤 출발해요.' });
+    d = cold;
+    if (d.tmin <= -5) out.push({ lv: 'over', tag: '날씨', t: md(d.date) + ' 최저 ' + Math.round(d.tmin) + '°', d: '혹한에는 배터리가 약해져요. 시동이 무거우면 바로 점검받아요.' });
+    else if (d.tmin <= 0) out.push({ lv: 'soon', tag: '날씨', t: md(d.date) + ' 영하 예보', d: '워셔액이 얼 수 있어요. 겨울용인지 확인해요.' });
+    else if (d.tmin <= 5) out.push({ lv: 'ok', tag: '날씨', t: md(d.date) + ' 최저 ' + Math.round(d.tmin) + '°', d: '기온이 내려가면 타이어 공기압도 떨어져요. 아침에 한 번 봐요.' });
+    if ((d = wet).rain >= 20) out.push({ lv: 'soon', tag: '날씨', t: md(d.date) + ' 비 ' + Math.round(d.rain) + 'mm', d: '와이퍼가 깨끗이 닦이는지 보고, 물이 고인 길은 피해요.' });
+    if ((d = hot).tmax >= 33) out.push({ lv: 'soon', tag: '날씨', t: md(d.date) + ' 최고 ' + Math.round(d.tmax) + '°', d: '실내가 매우 뜨거워져요. 냉각수 수위를 보고 인화성 물건은 빼 둬요.' });
+    return out;
+  }
+
+  function careTips(o) {
+    const out = [], today = o.today;
+    const add = (lv, tag, t, d) => out.push({ lv, tag, t, d });
+    if (o.kmDate) {
+      const ago = daysBetween(pd(o.kmDate), today);
+      if (ago > 30) add('soon', '기록', '주행거리 갱신', `기준일이 ${ago}일 전이에요. 주행거리로 계산하는 교체 시기와 보험 마일리지가 실제보다 여유 있게 보여요.`);
+    }
+    if (o.policyEnd) {
+      const dd = daysBetween(today, pd(o.policyEnd));
+      if (dd >= 0 && dd <= 45) add('soon', '기한', '보험 갱신 준비', `만기 D-${dd}. 마일리지 정산용 계기판 사진을 등록하고 갱신 견적을 비교해요.`);
+    }
+    if (o.inspNext) {
+      const w = inspectionWindow(o.inspNext), t = ymd(today);
+      if (t >= w.start && t <= w.end) add('over', '기한', '종합검사 기간', `${w.start} ~ ${w.end} 안에 검사를 받아요.`);
+      else if (t < w.start && daysBetween(today, pd(w.start)) <= 180 && o.inspAdvice) add('soon', '기한', '검사 전 정비', o.inspAdvice);
+    }
+    weatherTips(o.weather).forEach(x => out.push(x));
+    (SEASON[today.getUTCMonth() + 1] || []).forEach(x => add('ok', x[0], x[1], x[2]));
+    if (o.routine) add('ok', '매달', '엔진오일 양·타이어 공기압', o.routine);
+    return out;
+  }
+
   const api = {
-    DAY, pd, ymd, addMonths, daysBetween, calcPart, inspectionWindow,
+    DAY, pd, ymd, addMonths, daysBetween, calcPart, inspectionWindow, careTips, weatherTips,
     REC_COLS, COL_KO, recordsToCSV, parseCSV, csvToRecords, mergeById, normDate, toNum,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

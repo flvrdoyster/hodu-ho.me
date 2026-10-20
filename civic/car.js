@@ -200,7 +200,7 @@
 
   const SH = [2.5, 1.12, 2.6];
 
-  let W = 0, P = 3, img = null, zb = null, id = null;
+  let W = 0, P = 3, img = null, zb = null, id = null, DX = 0;
   function size() {
     P = box.clientWidth >= 600 ? 4 : 3;
     const w = Math.min(Math.floor(box.clientWidth / P), 150);
@@ -223,7 +223,7 @@
     const ca = Math.cos(yaw), sa = Math.sin(yaw), ce = Math.cos(PITCH), se = Math.sin(PITCH);
     const s = Math.min(W / 5.0, H / 3.1), cx = W / 2, cy = H * .7;
     const proj = p => {
-      const X = p[0] * ca + p[2] * sa, Z = -p[0] * sa + p[2] * ca;
+      const x = p[0] + DX, X = x * ca + p[2] * sa, Z = -x * sa + p[2] * ca;
       return [cx + X * s, cy - (p[1] * ce - Z * se) * s, Z * ce + p[1] * se];
     };
     const viewZ = n => (-n[0] * sa + n[2] * ca) * ce + n[1] * se;
@@ -255,11 +255,11 @@
       }
     }
 
-    const shc = cssColor('--line'), mu = cssColor('--muted');
-    const shd = shc.map((v, k) => Math.round(v * .65 + mu[k] * .35));
+    const bg = cssColor('--bg'), dark = bg[0] + bg[1] + bg[2] < 384;
+    const shc = bg.map(v => Math.round(v * (dark ? .55 : .9))), shd = bg.map(v => Math.round(v * (dark ? .3 : .8)));
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const gz = (y + .5 - cy) / (s * se), gx = (x + .5 - cx) / s;
-      const wx = gx * ca - gz * sa, wz = gx * sa + gz * ca;
+      const wx = gx * ca - gz * sa - DX, wz = gx * sa + gz * ca;
       const r = Math.pow(Math.abs(wx) / SH[0], SH[2]) + Math.pow(Math.abs(wz) / SH[1], SH[2]);
       if (r >= 1) continue;
       const c = r < .55 ? shd : shc, i = y * W + x;
@@ -292,31 +292,67 @@
   const still = window.matchMedia('(prefers-reduced-motion: reduce)');
   let yaw = REST, last = 0, acc = 0, raf = 0, seen = true, drag = null;
 
+  const ease = u => 1 - Math.pow(1 - u, 3);
+  let dash = null;
+  function dashStep(t) {
+    const e = t - dash.t0;
+    if (e < 220) {
+      const u = ease(e / 220);
+      yaw = dash.y0 + (dash.y1 - dash.y0) * u;
+      DX = -.18 * u;
+    } else if (e < 820) {
+      const u = (e - 220) / 600;
+      DX = -.18 + 16 * u * u;
+    } else if (e < 1400) {
+      DX = 99;
+    } else if (e < 2300) {
+      DX = -14 * (1 - ease((e - 1400) / 900));
+    } else {
+      DX = 0; dash = null;
+    }
+  }
+  function startDash() {
+    if (dash || still.matches) return;
+    const turn = Math.PI * 2, y1 = REST + Math.round((yaw - REST) / turn) * turn;
+    dash = { t0: performance.now(), y0: yaw, y1 };
+    loop();
+  }
+
   function tick(t) {
     raf = 0;
     const dt = last ? Math.min(t - last, 100) : 0;
     last = t;
+    if (dash) { dashStep(t); draw(yaw); loop(); return; }
     if (!drag && !still.matches) yaw += SPIN * dt / 1000;
     acc += dt;
     if (acc >= 1000 / FPS || !dt) { acc = 0; draw(yaw); }
     loop();
   }
   function loop() {
-    if (raf || !seen || document.hidden || (still.matches && !drag)) { last = 0; return; }
+    if (raf || !seen || document.hidden || (still.matches && !drag && !dash)) { last = 0; return; }
     raf = requestAnimationFrame(tick);
   }
 
+  let tap = 0;
   cv.addEventListener('pointerdown', e => {
+    if (dash) return;
     drag = { x: e.clientX, yaw };
     cv.setPointerCapture(e.pointerId);
     loop();
   });
   cv.addEventListener('pointermove', e => {
-    if (!drag) return;
+    if (!drag || dash) return;
     yaw = drag.yaw + (e.clientX - drag.x) * 0.015;
     if (still.matches) draw(yaw);
   });
-  const end = () => { drag = null; };
+  const end = e => {
+    if (!drag) return;
+    const moved = Math.abs(e.clientX - drag.x) > 6;
+    drag = null;
+    if (moved || e.type === 'pointercancel') { tap = 0; return; }
+    const now = performance.now();
+    if (now - tap < 320) { tap = 0; startDash(); } else tap = now;
+  };
   cv.addEventListener('pointerup', end);
   cv.addEventListener('pointercancel', end);
 

@@ -96,14 +96,13 @@
   function ddayLabel(dd) { return dd > 0 ? 'D-' + dd : dd === 0 ? 'D-Day' : 'D+' + (-dd); }
   function mileageHTML(p) {
     const left = p.mileageStartKm + p.mileageLimitKm - curKm();
-    return `<div class="meta" style="color:var(--ink2);margin-top:4px">마일리지 특약 <span class="num">${fmt(left)}km</span> 남음</div>`;
+    return `<div class="meta muted">마일리지 <span class="num">${fmt(left)}km</span> 남음</div>`;
   }
   function policyHTML() {
     const p = latestPolicy();
     if (!p) return '<p class="hint">가입 기록이 없어요.</p>';
     const dd = p.end ? daysBetween(today(), pd(p.end)) : null;
-    return `${dd != null ? `<div class="big num">${ddayLabel(dd)}</div>` : ''}<div class="meta" style="color:var(--ink2)">${esc(p.insurer)} · 만기 <span class="num">${esc(p.end || '-')}</span></div>
-      ${p.premium ? `<div class="meta" style="color:var(--ink2);margin-top:4px">보험료 <span class="num">${won(p.premium)}</span>${p.payMethod ? ' · ' + esc(p.payMethod) : ''}</div>` : ''}
+    return `${dd != null ? `<div class="big num">${ddayLabel(dd)}</div>` : ''}<div class="meta">${esc(p.insurer)} · 만기 <span class="num">${esc(p.end || '-')}</span></div>
       ${p.mileageStartKm && p.mileageLimitKm ? mileageHTML(p) : ''}`;
   }
 
@@ -118,44 +117,90 @@
     return `<div class="row"><div class="main"><div class="ttl">${esc(p.name)}</div><div class="meta">${remainText(p, c)}</div></div><div class="end">${pill(c.status)}</div></div>`;
   }
 
+  const WX = { days: null, fail: false };
+  const WCODE = c => c >= 95 ? '뇌우' : (c >= 71 && c <= 77) || c === 85 || c === 86 ? '눈' : c >= 51 ? '비' : c >= 45 ? '안개' : c >= 3 ? '흐림' : c >= 1 ? '구름' : '맑음';
+  function loadWeather() {
+    const a = D.settings.area;
+    if (!a || !window.fetch) return;
+    const key = 'civic:wx';
+    try {
+      const c = JSON.parse(localStorage.getItem(key));
+      if (c && c.lat === a.lat && c.lon === a.lon && Date.now() - c.t < 3 * 3600000) { WX.days = c.days; return; }
+    } catch (e) { /* 캐시 없음 */ }
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${a.lat}&longitude=${a.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum&timezone=Asia%2FSeoul&forecast_days=7`;
+    fetch(url).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+      const d = j.daily;
+      WX.days = d.time.map((t, i) => ({ date: t, code: d.weather_code[i], tmax: d.temperature_2m_max[i], tmin: d.temperature_2m_min[i], rain: d.precipitation_sum[i] || 0, snow: d.snowfall_sum[i] || 0 }));
+      try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), lat: a.lat, lon: a.lon, days: WX.days })); } catch (e) { /* 무시 */ }
+    }).catch(() => { WX.fail = true; }).then(() => { if (S.tab === 'home' && !S.editing) render(); });
+  }
+  function weatherHTML() {
+    const a = D.settings.area;
+    if (!a) return '';
+    if (!WX.days) return `<p class="hint">${WX.fail ? '날씨를 불러오지 못했어요.' : '날씨를 불러오는 중이에요.'}</p>`;
+    const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+    return `<div class="wx" role="list" aria-label="${esc(a.name)} 7일 예보">${WX.days.map((x, i) => `<div class="wd" role="listitem"><span class="dw">${i ? DOW[pd(x.date).getUTCDay()] : '오늘'}</span><span class="wc">${WCODE(x.code)}</span><span class="num"><b>${Math.round(x.tmax)}°</b> ${Math.round(x.tmin)}°</span>${x.rain >= 1 ? `<span class="num rn">${Math.round(x.rain)}mm</span>` : ''}</div>`).join('')}</div>`;
+  }
+
+  function tile(label, body, act) {
+    return `<section class="panel tile"><h2 class="sec">${label}${act || ''}</h2>${body}</section>`;
+  }
   function homeHTML() {
     const km = curKm(), t = today();
-    const attn = D.parts.map(p => ({ p, c: calcPart(p, km, t) })).filter(x => x.c.status === 'over' || x.c.status === 'soon').sort((a, b) => b.c.ratio - a.c.ratio);
-    const li = latestInsp();
+    const all = D.parts.map(p => ({ p, c: calcPart(p, km, t) }));
+    const attn = all.filter(x => x.c.status === 'over' || x.c.status === 'soon').sort((a, b) => b.c.ratio - a.c.ratio);
+    const cnt = k => all.filter(x => x.c.status === k).length;
+    const li = latestInsp(), lp = latestPolicy();
+    const issues = D.issues.filter(i => i.status !== 'done').sort((a, b) => (a.since || '').localeCompare(b.since || ''));
+
     let insp = '<p class="hint">검사 기록이 없어요.</p>';
     if (li && li.nextDate) {
-      const dd = daysBetween(t, pd(li.nextDate));
       const w = inspectionWindow(li.nextDate);
-      const inWin = todayStr() >= w.start && todayStr() <= w.end;
-      const label = ddayLabel(dd);
-      insp = `<div class="big num">${label}</div><div class="meta" style="color:var(--ink2)">다음 종합검사일 <span class="num">${esc(li.nextDate)}</span></div>
-      <div class="meta" style="color:var(--ink2);margin-top:4px">검사 가능 기간 <span class="num">${w.start} ~ ${w.end}</span> ${inWin ? pill('soon').replace('임박', '검사 기간') : ''}</div>
-      <div class="meta" style="color:var(--muted);margin-top:4px">마지막 검사 <span class="num">${esc(li.date)}</span> · ${esc(li.result || '')}</div>`;
+      insp = `<div class="big num">${ddayLabel(daysBetween(t, pd(li.nextDate)))}</div><div class="meta">다음 검사일 <span class="num">${esc(li.nextDate)}</span></div>
+      <div class="meta muted">검사 기간 <span class="num">${w.start}~${w.end.slice(5)}</span></div>`;
     }
     const repairs = D.records.filter(r => r.kind === 'repair');
     const total = repairs.reduce((a, r) => a + (r.amount || 0), 0);
+    const round = `약 ${Math.round(total / 1e6) * 100}만원`;
     const dates = repairs.map(r => r.date).sort();
-    const issues = D.issues.filter(i => i.status !== 'done').sort((a, b) => (a.since || '').localeCompare(b.since || ''));
-    const recent = D.records.slice().sort(byDateDesc).slice(0, 4);
-    return `<div class="grid">
+    const cost = `<button class="big num total" data-act="total" data-exact="${won(total)}" data-round="${round}" aria-label="누적 정비비. 누르면 실제 금액과 어림값을 바꿔 보여요">${round}</button>
+      <div class="meta">자비 정비 ${repairs.length}건${dates.length ? ` · <span class="num">${dates[0].slice(0, 4)}~${dates[dates.length - 1].slice(0, 4)}</span>` : ''}</div>`;
+    const parts = `<div class="big num">${attn.length ? attn.length + '개' : '없음'}</div><div class="meta">교체 필요 ${cnt('over')} · 임박 ${cnt('soon')}</div><div class="meta muted">기록 없음 ${cnt('none')} · 정상 ${cnt('ok')}</div>`;
+
+    const leak = issues.some(i => /누유/.test(i.text));
+    const tips = L.careTips({
+      today: t, kmDate: D.settings.kmDate, policyEnd: lp && lp.end, inspNext: li && li.nextDate,
+      inspAdvice: leak ? '종합검사에서 시정권고 받은 누유를 검사 전에 정비해 둬요.' : '', weather: WX.days,
+      routine: leak ? '누유 이력이 있어서 오일이 줄지 않았는지 게이지로 봐요. 공기압도 같이요.' : '',
+    });
+    const LV = { over: 0, soon: 1, ok: 2 };
+    tips.sort((a, b) => LV[a.lv] - LV[b.lv]);
+    const tipRow = x => `<div class="row"><div class="main"><div class="ttl"><i class="dot ${x.lv}" aria-hidden="true"></i>${esc(x.t)}</div><div class="meta">${esc(x.d)}</div></div><div class="end"><span class="tag">${esc(x.tag)}</span></div></div>`;
+    const recent = D.records.slice().sort(byDateDesc).slice(0, 3);
+    const more = v => `<button class="btn ghost" data-act="tab" data-v="${v}">전체 보기</button>`;
+
+    return `<div class="kpis">
+      ${tile('종합검사', insp)}
+      ${tile('자동차보험', policyHTML())}
+      ${tile('소모품', parts, more('parts'))}
+      ${tile('누적 정비비', cost)}
+    </div>
+    <div class="grid">
     <div class="stack">
-      <section><h2 class="sec">지금 챙길 소모품 <button class="btn ghost" data-act="tab" data-v="parts">전체 보기</button></h2>
-        ${attn.length ? attn.map(partRowShort).join('') : `<div class="empty"><b>임박한 항목이 없어요</b>${D.parts.length ? '모든 항목이 주기 안에 있어요.' : '등록된 교체 항목이 없어요.'}</div>`}
+      <section><h2 class="sec">요즘 챙길 것${D.settings.area ? `<span class="hint">${esc(D.settings.area.name)} 날씨 기준</span>` : ''}</h2>
+        ${weatherHTML()}
+        ${tips.map(tipRow).join('')}
       </section>
-      <section><h2 class="sec">최근 정비 <button class="btn ghost" data-act="tab" data-v="log">전체 보기</button></h2>
-        ${recent.length ? recent.map(r => `<div class="row ${r.kind === 'estimate' ? 'est' : ''}"><div class="main"><div class="ttl">${esc(r.title)}</div><div class="meta"><span class="date">${esc(r.date)}</span> · ${esc(r.shop)} · <span class="num">${fmt(r.km)}km</span></div></div><div class="end">${kindPill(r.kind)}</div></div>`).join('') : '<p class="hint">정비 기록이 없어요.</p>'}
+      <section><h2 class="sec">지금 챙길 소모품 ${more('parts')}</h2>
+        ${attn.length ? attn.map(partRowShort).join('') : `<div class="empty"><b>임박한 항목이 없어요</b>${D.parts.length ? '모든 항목이 주기 안에 있어요.' : '등록된 교체 항목이 없어요.'}</div>`}
       </section>
     </div>
     <div class="stack">
-      <section class="panel"><h2 class="sec">종합검사</h2>${insp}</section>
-      <section class="panel"><h2 class="sec">자동차보험</h2>${policyHTML()}</section>
       <section><h2 class="sec">열린 이슈 ${ed('<button class="btn ghost" data-act="new" data-type="issue">추가</button>')}</h2>
         ${issues.length ? issues.map(i => `<div class="row"><div class="main"><div class="ttl">${esc(i.text)}</div><div class="meta"><span class="date">${esc(i.since || '')}</span></div></div>${ed(`<div class="end"><button class="btn ghost" data-act="issueDone" data-id="${esc(i.id)}">완료</button></div>`)}</div>`).join('') : '<p class="hint">열린 이슈가 없어요.</p>'}
       </section>
-      <section><h2 class="sec">누적 정비비</h2>
-        <button class="big num total" data-act="total" data-exact="${won(total)}" data-round="약 ${Math.round(total / 1e6) * 100}만원" aria-label="누적 정비비, 누르면 실제 금액 표시">약 ${Math.round(total / 1e6) * 100}만원</button>
-        <div class="meta" style="color:var(--ink2)">자비 정비 ${repairs.length}건${dates.length ? ` · <span class="num">${dates[0].slice(0, 7)} ~ ${dates[dates.length - 1].slice(0, 7)}</span>` : ''}</div>
-        <div class="hint" style="margin-top:4px">보험 수리와 견적은 제외</div>
+      <section><h2 class="sec">최근 정비 ${more('log')}</h2>
+        ${recent.length ? recent.map(r => `<div class="row ${r.kind === 'estimate' ? 'est' : ''}"><div class="main"><div class="ttl">${esc(r.title)}</div><div class="meta"><span class="date">${esc(r.date)}</span> · ${esc(r.shop)}</div></div><div class="end">${kindPill(r.kind)}</div></div>`).join('') : '<p class="hint">정비 기록이 없어요.</p>'}
       </section>
     </div>
   </div>`;
@@ -204,7 +249,7 @@
   <section style="margin-top:32px"><h2 class="sec">종합검사 ${ed('<button class="btn ghost" data-act="new" data-type="insp">검사 추가</button>')}</h2>
   ${insp.length ? insp.map(i => `<div class="row"><div class="main"><div class="ttl">${esc(i.result || '')} <span class="date">${esc(i.date)}</span></div><div class="meta"><span class="num">${fmt(i.km)}km</span> · 다음 검사일 <span class="num">${esc(i.nextDate || '-')}</span>${i.note ? '<br>' + esc(i.note) : ''}</div></div>${ed(`<div class="end"><button class="btn ghost" data-act="edit" data-type="insp" data-id="${esc(i.id)}">수정</button></div>`)}</div>`).join('') : '<p class="hint">검사 기록이 없어요.</p>'}</section>
   <section style="margin-top:32px"><h2 class="sec">자동차보험 ${ed('<button class="btn ghost" data-act="new" data-type="policy">가입 추가</button>')}</h2>
-  ${pols.length ? pols.map(p => `<div class="row"><div class="main"><div class="ttl">${esc(p.insurer)} <span class="date">${esc(p.start || '')} ~ ${esc(p.end || '')}</span></div><div class="meta">${(p.coverage || []).map(esc).join(' · ')}${p.note ? '<br>' + esc(p.note) : ''}</div></div>${ed(`<div class="end"><button class="btn ghost" data-act="edit" data-type="policy" data-id="${esc(p.id)}">수정</button></div>`)}</div>`).join('') : '<p class="hint">가입 기록이 없어요.</p>'}</section>`;
+  ${pols.length ? pols.map(p => `<div class="row"><div class="main"><div class="ttl">${esc(p.insurer)} <span class="date">${esc(p.start || '')} ~ ${esc(p.end || '')}</span></div><div class="meta">${p.premium ? `보험료 <span class="num">${won(p.premium)}</span>${p.payMethod ? ' · ' + esc(p.payMethod) : ''}<br>` : ''}${(p.coverage || []).map(esc).join(' · ')}${p.note ? '<br>' + esc(p.note) : ''}</div></div>${ed(`<div class="end"><button class="btn ghost" data-act="edit" data-type="policy" data-id="${esc(p.id)}">수정</button></div>`)}</div>`).join('') : '<p class="hint">가입 기록이 없어요.</p>'}</section>`;
   }
 
   function niceStep(v) {
@@ -546,6 +591,7 @@
   });
   document.addEventListener('keydown', e => { if (EDIT && e.key === 'Enter' && e.target.id === 'kmInput') H.saveKm(); });
 
+  loadWeather();
   const h = (location.hash || '').replace('#', '');
   if (TABS.some(t => t[0] === h)) S.tab = h;
   render();
