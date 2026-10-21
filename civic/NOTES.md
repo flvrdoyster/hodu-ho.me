@@ -17,6 +17,14 @@
 
 `index.html`에서 `data.js` → `config.js` → `logic.js` → `script.js` → `car.js` 순서로 불러온다. 외부 의존성은 Pretendard 웹폰트(jsDelivr, wedding과 같은 v1.3.9)와 요약 탭의 날씨 예보(Open-Meteo, 키 없음)다. 예보는 `settings.area` 좌표로 7일치를 받아 `localStorage`의 `civic:wx`에 3시간 캐시한다. 못 받으면 날씨 줄만 비고 나머지 알림은 그대로 뜬다.
 
+## 로컬 확인
+
+```bash
+python3 -m http.server 7847 -d civic    # http://localhost:7847
+```
+
+포트는 7847로 고정한다(차량번호 31버7847). 편집 모드는 `http://localhost:7847/?edit`로 연다. `config.js`의 시트 주소가 실제 웹앱이라 로컬에서 로그인하고 저장하면 진짜 시트가 바뀐다.
+
 ## 운영 방식
 
 - 데이터 원본은 구글 시트다. 보기 모드는 시트를 읽어 보여 주고, 편집은 `?edit` 모드에서만 된다. 시트 주소(`config.js`)가 비어 있으면 예전처럼 `data.js`만 읽는 보기 전용이다.
