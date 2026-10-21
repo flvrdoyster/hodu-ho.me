@@ -3,12 +3,22 @@
   const L = window.CivicLogic;
   const { DAY, pd, ymd, daysBetween, calcPart, inspectionWindow } = L;
 
-  const EDIT = false;
-  const KEY = 'civic:v1';
+  const API = (window.CIVIC_CONFIG && window.CIVIC_CONFIG.api) || '';
+  const TOKEN_KEY = 'civic:token';
+  const CACHE_KEY = 'civic:sheet';
+  const WANT_EDIT = /[?&]edit(=|&|$)/.test(location.search);
+  let EDIT = false;
   const WRITE = new Set(['editKm', 'cancelKm', 'saveKm', 'new', 'edit', 'save', 'cancel', 'del', 'replaced', 'issueDone',
-    'backup', 'restore', 'csvExport', 'csvImport', 'csvApply', 'csvClear', 'saveVehicle']);
+    'backup', 'restore', 'csvExport', 'csvImport', 'csvApply', 'csvClear', 'saveVehicle', 'logout', 'retry', 'seed']);
   const ed = html => EDIT ? html : '';
   const COLS = ['records', 'parts', 'inspections', 'issues', 'policies'];
+  const KEYS = COLS.concat('settings');
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) { /* 무시 */ } },
+  };
 
   function emptyData() {
     return { records: [], parts: [], inspections: [], issues: [], policies: [], settings: { currentKm: 0, plate: '', model: '' } };
@@ -20,18 +30,71 @@
     d.settings = Object.assign(d.settings, raw.settings || {});
     return d;
   }
-  function loadData() {
-    if (!EDIT) return normalize(window.CIVIC_DATA);
-    try { return normalize(JSON.parse(localStorage.getItem(KEY)) || window.CIVIC_DATA); } catch (e) { return emptyData(); }
-  }
-  function saveData() {
-    if (!EDIT) return false;
-    try { localStorage.setItem(KEY, JSON.stringify(D)); return true; } catch (e) { toast('저장하지 못했어요. 브라우저 저장 공간을 확인하세요.'); return false; }
+  function readCache() {
+    try { const c = JSON.parse(store.get(CACHE_KEY)); return c && c.data ? c : null; } catch (e) { return null; }
   }
   function newId() { return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
-  let D = loadData();
-  const S = { tab: 'home', filter: 'all', shopf: 'all', q: '', editing: null, kmEdit: false, incIns: false, pending: null, pick: null, msg: '' };
+  const cache = API ? readCache() : null;
+  let D = normalize(API ? (cache && cache.data) : window.CIVIC_DATA);
+  const S = { tab: 'home', filter: 'all', shopf: 'all', q: '', editing: null, kmEdit: false, incIns: false, pending: null, pick: null, msg: '',
+    loading: !!API && !cache, fatal: '', login: false, busy: false, seedable: false };
+  const SYNC = { rev: '', snap: {}, token: store.get(TOKEN_KEY) || '', status: '', sheetUrl: '', ready: false, blocked: false };
+
+  async function call(action, body) {
+    const res = body
+      ? await fetch(API, { method: 'POST', body: JSON.stringify(Object.assign({ action }, body)) })
+      : await fetch(API + '?action=' + action);
+    return res.json();
+  }
+  function snapshot() {
+    KEYS.forEach(k => { SYNC.snap[k] = JSON.stringify(D[k]); });
+  }
+  function dirtyKeys() { return KEYS.filter(k => JSON.stringify(D[k]) !== SYNC.snap[k]); }
+
+  async function loadRemote() {
+    const r = await call('get');
+    if (!r || !r.ok) throw new Error('get');
+    SYNC.rev = r.rev;
+    if (r.empty) {
+      D = normalize(window.CIVIC_DATA);
+      S.seedable = true;
+      return false;
+    }
+    const nd = normalize(r.data);
+    const changed = JSON.stringify(nd) !== JSON.stringify(D);
+    D = nd; snapshot(); SYNC.ready = true;
+    store.set(CACHE_KEY, JSON.stringify({ rev: r.rev, t: Date.now(), data: r.data }));
+    return changed;
+  }
+
+  let queue = Promise.resolve();
+  async function flush() {
+    if (SYNC.blocked) return;
+    const keys = dirtyKeys();
+    if (!keys.length) return;
+    const changes = {}, snap = {};
+    keys.forEach(k => { changes[k] = D[k]; snap[k] = JSON.stringify(D[k]); });
+    SYNC.status = 'saving'; renderBar();
+    let r;
+    try { r = await call('save', { token: SYNC.token, rev: SYNC.rev, changes }); } catch (e) { r = { ok: false, error: 'network' }; }
+    if (r.ok) {
+      SYNC.rev = r.rev;
+      keys.forEach(k => { SYNC.snap[k] = snap[k]; });
+      SYNC.status = 'saved';
+      store.set(CACHE_KEY, JSON.stringify({ rev: r.rev, t: Date.now(), data: D }));
+    } else if (r.error === 'conflict') { SYNC.blocked = true; SYNC.status = 'conflict'; }
+    else if (r.error === 'auth') { SYNC.blocked = true; SYNC.status = 'auth'; store.del(TOKEN_KEY); }
+    else SYNC.status = 'error';
+    toast(SYNC.status === 'saved' ? '시트에 저장됨' : SYNC_TEXT[SYNC.status] + (SYNC.status === 'error' ? ' · 위에서 다시 시도하세요' : ''));
+    renderBar();
+  }
+  function saveData() {
+    if (!EDIT) return false;
+    if (!SYNC.ready || SYNC.blocked) { toast('지금은 저장할 수 없어요. 위의 상태를 확인하세요.'); return false; }
+    queue = queue.then(flush);
+    return true;
+  }
 
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -105,9 +168,36 @@
     });
   }
 
-  const TABS = [['home', '요약'], ['parts', '교체 주기'], ['log', '정비 이력'], ['stats', '통계'], ['data', '데이터']].filter(t => EDIT || t[0] !== 'data');
+  const TABS_ALL = [['home', '요약'], ['parts', '교체 주기'], ['log', '정비 이력'], ['stats', '통계'], ['data', '데이터']];
+  const tabList = () => TABS_ALL.filter(t => EDIT || t[0] !== 'data');
   function renderTabs() {
-    $('#tabs').innerHTML = TABS.map(t => `<button class="tab" role="tab" aria-selected="${S.tab === t[0]}" data-act="tab" data-v="${t[0]}">${t[1]}</button>`).join('');
+    if (S.login || S.fatal) { $('#tabs').innerHTML = ''; return; }
+    $('#tabs').innerHTML = tabList().map(t => `<button class="tab" role="tab" aria-selected="${S.tab === t[0]}" data-act="tab" data-v="${t[0]}">${t[1]}</button>`).join('');
+  }
+
+  const SYNC_TEXT = { saving: '시트에 저장하는 중…', saved: '시트에 저장됨', error: '저장하지 못했어요', conflict: '시트가 다른 곳에서 먼저 바뀌어 저장하지 않았어요', auth: '로그인이 풀렸어요' };
+  function renderBar() {
+    let el = $('#editbar');
+    if (!EDIT) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'editbar'; el.className = 'editbar'; $('#tabs').before(el); }
+    const st = SYNC.status;
+    el.innerHTML = `<span class="tag">편집 모드</span><span class="sync ${st}" role="status">${SYNC_TEXT[st] || ''}</span>`
+      + (st === 'error' ? '<button class="btn ghost" data-act="retry">다시 시도</button>' : '')
+      + (st === 'conflict' ? '<button class="btn ghost" data-act="reload">새로 불러오기</button>' : '')
+      + (st === 'auth' ? '<button class="btn ghost" data-act="reload">다시 로그인</button>' : '')
+      + '<span class="sp"></span>'
+      + (SYNC.sheetUrl ? `<a class="btn ghost" href="${esc(SYNC.sheetUrl)}" target="_blank" rel="noopener">시트 열기</a>` : '')
+      + '<button class="btn ghost" data-act="logout">로그아웃</button>';
+  }
+  function loginHTML() {
+    return `<section class="panel login"><h3>편집 모드</h3>
+      <p class="hint">${esc(S.msg) || '비밀번호를 입력하면 이 기기에서 편집할 수 있어요. 한 번 로그인하면 이 기기를 기억해요.'}</p>
+      <form id="loginForm"><label class="f" style="margin-top:12px">비밀번호<input id="pw" type="password" autocomplete="current-password" ${S.busy ? 'disabled' : ''}></label>
+      <div class="actions" style="margin-top:12px"><button class="btn primary" type="submit" ${S.busy ? 'disabled' : ''}>로그인</button><button class="btn" type="button" data-act="cancelLogin">보기 모드로</button></div></form></section>`;
+  }
+  function seedHTML() {
+    return `<section class="panel" style="margin-bottom:20px"><h3>시트가 비어 있어요</h3><p class="hint">지금 보이는 데이터는 코드에 들어 있던 원본이에요. 시트로 올리면 이때부터 시트가 원본이 돼요.</p>
+      <div class="actions" style="margin-top:12px"><button class="btn primary" data-act="seed">시트에 채우기</button></div></section>`;
   }
 
   function latestInsp() { return D.inspections.slice().sort(byDateDesc)[0] || null; }
@@ -136,7 +226,7 @@
     return `<div class="row"><div class="main"><div class="ttl">${esc(p.name)}</div><div class="meta">${remainText(p, c)}</div></div><div class="end">${pill(c.status)}</div></div>`;
   }
 
-  const WX = { days: null, fail: false };
+  const WX = { days: null, fail: false, started: false };
   const WXI = {
     clear: ['.......yy.......', '.......yy.......', '..yy...yy...yy..', '..yy........yy..', '......kkkk......', '.....kyyyyk.....', '....kyyyyyyk....', 'yyy.kyyyyyok.yyy', 'yyy.kyyyyook.yyy', '....kyyyoook....', '.....kyoook.....', '......kkkk......', '..yy........yy..', '..yy...yy...yy..', '.......yy.......', '.......yy.......'],
     partly: ['................', '...kkk..........', '..kyyyk.........', '.kyyyyyk........', '.kyyyyok........', '.kyyyook........', '..kyookkkkk.....', '...kkkkwwwwk....', '....kkwwwwwwk...', '...kwwwwwwwwwkk.', '..kwwwwwwwwwwwwk', '..kwwwwwwwwwwwgk', '..kggggggggggggk', '...kkkkkkkkkkkk.', '................', '................'],
@@ -166,7 +256,8 @@
   }
   function loadWeather() {
     const a = D.settings.area;
-    if (!a || !window.fetch) return;
+    if (WX.started || !a || !window.fetch) return;
+    WX.started = true;
     const key = 'civic:wx';
     try {
       const c = JSON.parse(localStorage.getItem(key));
@@ -415,18 +506,24 @@
 
   function dataHTML() {
     const s = D.settings, p = S.pending;
-    return `<p class="notice">데이터는 이 브라우저에만 저장돼요. 기기를 바꾸거나 브라우저 데이터를 지우기 전에 백업 파일을 받아 두세요.</p>
+    return `<p class="notice">고친 내용은 구글 시트에 저장돼요. 이 기기는 로그인한 기기라서 편집할 수 있고, 로그아웃하면 편집 권한이 사라져요.</p>
   <div class="grid"><div class="stack">
    <section class="panel"><h3>백업</h3><p class="hint">정비 이력, 교체 주기, 종합검사, 자동차보험, 이슈, 설정 전체를 JSON 파일로 저장하거나 복원해요. 복원하면 지금 데이터가 모두 바뀌어요.</p>
      <div class="actions" style="margin-top:12px"><button class="btn primary" data-act="backup">백업 받기</button><button class="btn" data-act="restore">백업 불러오기</button></div></section>
-   <section class="panel"><h3>구글 시트</h3><p class="hint">정비 이력을 CSV로 받아 구글 시트의 파일 › 가져오기로 열어요. 시트에서 고친 CSV를 다시 불러오면 같은 id의 기록은 시트 값으로 덮어써요. 교체 주기와 검사 기록은 포함되지 않아요.</p>
+   <section class="panel"><h3>구글 시트</h3><p class="hint">시트에서 직접 고쳐도 돼요. 이 페이지는 열 때 시트를 읽어 오고, 열어 둔 사이에 시트가 바뀌었으면 저장할 때 알려 줘요.</p>
+     ${SYNC.sheetUrl ? `<div class="actions" style="margin-top:12px"><a class="btn" href="${esc(SYNC.sheetUrl)}" target="_blank" rel="noopener">시트 열기</a></div>` : ''}</section>
+   <section class="panel"><h3>CSV</h3><p class="hint">정비 이력을 CSV로 내보내거나, 고친 CSV를 불러와 같은 id의 기록을 덮어써요. 교체 주기와 검사 기록은 포함되지 않아요.</p>
      <div class="actions" style="margin-top:12px"><button class="btn primary" data-act="csvExport" ${D.records.length ? '' : 'disabled'}>CSV 내보내기</button><button class="btn" data-act="csvImport">CSV 불러오기</button></div>
      ${p ? `<div class="out"><b>${p.length}건</b>을 읽었어요.<div class="actions" style="margin-top:10px"><button class="btn primary" data-act="csvApply" ${p.length ? '' : 'disabled'}>병합 적용</button><button class="btn" data-act="csvClear">취소</button></div></div>` : ''}
      <div class="out">${esc(S.msg)}</div></section>
   </div><div class="stack">
    <section class="panel"><h3>차량 정보</h3><div class="formgrid" style="margin-top:12px">
      <label class="f wide">차량 번호<input id="s_plate" type="text" value="${esc(s.plate)}"></label>
-     <label class="f wide">차종 표시<input id="s_model" type="text" value="${esc(s.model)}" placeholder="예: CIVIC 1.8 · FD1 · 2008년식"></label></div>
+     <label class="f wide">차종 표시<input id="s_model" type="text" value="${esc(s.model)}" placeholder="예: CIVIC 1.8 · FD1 · 2008년식"></label>
+     <label class="f wide">차대번호<input id="s_vin" type="text" value="${esc(s.vin)}"></label>
+     <label class="f wide">날씨 지역<input id="s_area" type="text" value="${esc((s.area || {}).name)}" placeholder="예: 성남"></label>
+     <label class="f">위도<input id="s_lat" type="number" step="any" value="${esc((s.area || {}).lat)}"></label>
+     <label class="f">경도<input id="s_lon" type="number" step="any" value="${esc((s.area || {}).lon)}"></label></div>
      <div class="actions" style="margin-top:12px"><button class="btn primary" data-act="saveVehicle">저장</button></div></section>
    <section><h2 class="sec">CSV 열 구성</h2><p class="hint" style="line-height:1.8">${L.REC_COLS.map(c => L.COL_KO[c]).join(' · ')}<br>내역은 「 | 」로 구분해요. 구분 값은 repair, insurance, estimate, 정비소유형 값은 honda, general이에요.</p></section>
   </div></div>`;
@@ -503,7 +600,7 @@
     upsert(F.col, E.id, body);
     if (E.type === 'record' && body.kind !== 'estimate' && body.km > D.settings.currentKm) { D.settings.currentKm = body.km; D.settings.kmDate = body.date; }
     if (!saveData()) return;
-    S.editing = null; toast('저장됨'); render();
+    S.editing = null; render();
   }
 
   function download(name, text, type) {
@@ -539,7 +636,41 @@
     reader.readAsText(file, 'utf-8');
   }
 
+  const leaveEdit = () => { location.href = location.pathname + location.hash; };
+  const LOGIN_ERR = { password: '비밀번호가 맞지 않아요.', locked: '실패가 많아 잠시 잠겼어요. 10분 뒤에 다시 시도하세요.', 'no-password': '서버에 비밀번호가 설정되지 않았어요.' };
+
   const H = {
+    async login() {
+      const pw = $('#pw').value;
+      if (!pw) return;
+      S.busy = true; S.msg = '확인하는 중…'; render();
+      let r = null;
+      try { r = await call('login', { password: pw, label: navigator.userAgent.slice(0, 60) }); } catch (e) { S.msg = '서버에 연결하지 못했어요.'; }
+      S.busy = false;
+      if (r && r.ok) {
+        SYNC.token = r.token; SYNC.sheetUrl = r.sheetUrl || '';
+        if (!store.set(TOKEN_KEY, r.token)) toast('이 브라우저는 로그인 정보를 저장하지 못해요. 이번 방문에서만 편집돼요.');
+        S.msg = '';
+        await enterEdit();
+        return;
+      }
+      if (r) S.msg = LOGIN_ERR[r.error] || '로그인하지 못했어요.';
+      render();
+      const i = $('#pw'); if (i) i.focus();
+    },
+    cancelLogin() { leaveEdit(); },
+    logout() {
+      call('logout', { token: SYNC.token }).catch(() => {});
+      store.del(TOKEN_KEY); SYNC.token = '';
+      leaveEdit();
+    },
+    retry() { queue = queue.then(flush); },
+    reload() { location.reload(); },
+    seed() {
+      if (!S.seedable) return;
+      SYNC.snap = {}; SYNC.ready = true; S.seedable = false;
+      saveData(); render();
+    },
     total(b) {
       const exact = b.textContent === b.dataset.exact;
       b.textContent = exact ? b.dataset.round : b.dataset.exact;
@@ -558,7 +689,7 @@
       if (!(v >= 0)) return;
       D.settings.currentKm = v; D.settings.kmDate = todayStr();
       if (!saveData()) return;
-      S.kmEdit = false; toast('주행거리 저장됨'); render();
+      S.kmEdit = false; render();
     },
     new(b) { S.editing = { type: b.dataset.type, id: null, data: formDefaults(b.dataset.type) }; render(); window.scrollTo(0, 0); },
     edit(b) {
@@ -574,7 +705,7 @@
       const E = S.editing, col = FORMS[E.type].col;
       D[col] = D[col].filter(x => x.id !== E.id);
       if (!saveData()) return;
-      S.editing = null; toast('삭제됨'); render();
+      S.editing = null; render();
     },
     replaced(b) {
       const km = curKm();
@@ -582,13 +713,13 @@
       const p = D.parts.find(x => x.id === b.dataset.id);
       if (!p) return;
       p.lastDate = todayStr(); p.lastKm = km;
-      if (saveData()) { toast('교체 기록됨'); render(); }
+      if (saveData()) render();
     },
     issueDone(b) {
       const i = D.issues.find(x => x.id === b.dataset.id);
       if (!i) return;
       i.status = 'done'; i.doneDate = todayStr();
-      if (saveData()) { toast('이슈 완료'); render(); }
+      if (saveData()) render();
     },
     backup() { download('civic-backup-' + todayStr() + '.json', JSON.stringify(D, null, 2), 'application/json'); },
     restore() { pickFile('json', 'application/json,.json'); },
@@ -606,18 +737,31 @@
     saveVehicle() {
       D.settings.plate = $('#s_plate').value.trim();
       D.settings.model = $('#s_model').value.trim();
-      if (saveData()) { toast('저장됨'); render(); }
+      D.settings.vin = $('#s_vin').value.trim();
+      const lat = $('#s_lat').value.trim(), lon = $('#s_lon').value.trim(), name = $('#s_area').value.trim();
+      if (name && lat !== '' && lon !== '') D.settings.area = { name, lat: Number(lat), lon: Number(lon) };
+      else delete D.settings.area;
+      if (saveData()) render();
     },
   };
 
   function bodyHTML() {
+    if (EDIT && S.seedable) return seedHTML() + bodyContent();
+    return bodyContent();
+  }
+  function bodyContent() {
     if (!D.records.length && !D.parts.length && !S.editing && S.tab !== 'data') {
       return `<div class="empty"><b>아직 기록이 없어요</b>${ed('정비 이력 탭에서 첫 기록을 추가하거나, 데이터 탭에서 백업 파일을 불러오세요.<div class="actions" style="margin-top:12px"><button class="btn primary" data-act="new" data-type="record">정비 추가</button><button class="btn" data-act="tab" data-v="data">데이터 탭</button></div>')}</div>`;
     }
     return ({ home: homeHTML, parts: partsHTML, log: logHTML, stats: statsHTML, data: dataHTML })[S.tab]();
   }
   function render() {
-    renderVehicle(); renderHead(); renderTabs();
+    if (!S.loading && !S.login && !S.fatal) { renderVehicle(); renderHead(); }
+    renderTabs(); renderBar();
+    if (!S.loading) loadWeather();
+    if (S.loading) { $('#view').innerHTML = '<div class="empty">불러오는 중…</div>'; return; }
+    if (S.fatal) { $('#view').innerHTML = `<div class="empty"><b>${esc(S.fatal)}</b><div class="actions" style="margin-top:12px"><button class="btn" data-act="reload">다시 시도</button><button class="btn" data-act="cancelLogin">보기 모드로</button></div></div>`; return; }
+    if (S.login) { $('#view').innerHTML = loginHTML(); return; }
     if (S.editing) { $('#view').innerHTML = formHTML(); return; }
     $('#view').innerHTML = bodyHTML();
     if (S.tab === 'stats') CH.forEach(x => bindTip($('#' + x.id), x.c));
@@ -635,9 +779,47 @@
     if (e.target.id === 'file' && e.target.files[0]) onFile(e.target.files[0]);
   });
   document.addEventListener('keydown', e => { if (EDIT && e.key === 'Enter' && e.target.id === 'kmInput') H.saveKm(); });
+  document.addEventListener('submit', e => { if (e.target.id === 'loginForm') { e.preventDefault(); H.login(); } });
+  window.addEventListener('beforeunload', e => {
+    if (EDIT && (SYNC.status === 'saving' || SYNC.status === 'error' || dirtyKeys().length)) { e.preventDefault(); e.returnValue = ''; }
+  });
 
-  loadWeather();
-  const h = (location.hash || '').replace('#', '');
-  if (TABS.some(t => t[0] === h)) S.tab = h;
-  render();
+  function applyHash() {
+    const h = (location.hash || '').replace('#', '');
+    if (tabList().some(t => t[0] === h)) S.tab = h;
+  }
+  async function enterEdit() {
+    EDIT = true; S.login = false; S.fatal = ''; S.loading = true; render();
+    try { await loadRemote(); } catch (e) { S.fatal = '시트를 불러오지 못해 편집할 수 없어요.'; }
+    S.loading = false; applyHash(); render();
+  }
+  async function boot() {
+    applyHash();
+    if (!API) {
+      if (WANT_EDIT) S.fatal = '시트 주소가 설정되지 않아 편집할 수 없어요.';
+      render();
+      return;
+    }
+    if (WANT_EDIT) {
+      if (SYNC.token) {
+        S.loading = true; render();
+        try {
+          const c = await call('check', { token: SYNC.token });
+          if (c && c.ok) { SYNC.sheetUrl = c.sheetUrl || ''; await enterEdit(); return; }
+          store.del(TOKEN_KEY); SYNC.token = '';
+        } catch (e) { S.loading = false; S.fatal = '서버에 연결하지 못했어요.'; render(); return; }
+      }
+      S.loading = false; S.login = true; render();
+      return;
+    }
+    render();
+    try {
+      const changed = await loadRemote();
+      if (S.loading || changed) { S.loading = false; render(); }
+    } catch (e) {
+      if (S.loading) { S.loading = false; D = normalize(window.CIVIC_DATA); render(); }
+    }
+  }
+
+  boot();
 })();
