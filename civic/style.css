@@ -33,6 +33,10 @@ button,input,select,textarea{font:inherit}
 h1{margin:0;font-size:32px;line-height:40px;font-weight:700;text-wrap:balance}
 .title{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
 .sub{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:6px;color:var(--ink2);font-size:13px}
+.vin{display:inline-flex;align-items:center;gap:6px;color:var(--ink2)}
+.vin .lbl{color:var(--muted);font-size:12px}
+.vin .no{user-select:all;letter-spacing:.02em}
+.vin .btn.ghost{padding:0 4px;font-size:12.5px}
 .plate{border:1px solid var(--ink);padding:0 6px;font-size:16px;line-height:24px;color:var(--ink)}
 .garage{flex:1 0 100%;display:flex;justify-content:center}
 .car{display:block;image-rendering:pixelated;touch-action:pan-y;cursor:grab}

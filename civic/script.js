@@ -9,7 +9,7 @@
   const WANT_EDIT = /[?&]edit(=|&|$)/.test(location.search);
   let EDIT = false;
   const WRITE = new Set(['editKm', 'cancelKm', 'saveKm', 'new', 'edit', 'save', 'cancel', 'del', 'replaced', 'issueDone',
-    'backup', 'restore', 'csvExport', 'csvImport', 'csvApply', 'csvClear', 'saveVehicle', 'logout', 'retry', 'seed']);
+    'backup', 'restore', 'csvExport', 'csvImport', 'csvApply', 'csvClear', 'saveVehicle', 'logout', 'retry', 'seed', 'copyVin']);
   const ed = html => EDIT ? html : '';
   const COLS = ['records', 'parts', 'inspections', 'issues', 'policies'];
   const KEYS = COLS.concat('settings');
@@ -130,7 +130,7 @@
   function renderVehicle() {
     const s = D.settings;
     $('#plate').textContent = s.plate || '';
-    $('#vehicle').textContent = s.model || '';
+    $('#vehicle').innerHTML = esc(s.model || '') + (EDIT && s.vin ? ` <span class="vin"><span class="lbl">차대번호</span><span class="no num" tabindex="0">${esc(s.vin)}</span><button class="btn ghost" data-act="copyVin">복사</button></span>` : '');
   }
 
   function renderHead() {
@@ -659,6 +659,22 @@
       const i = $('#pw'); if (i) i.focus();
     },
     cancelLogin() { leaveEdit(); },
+    copyVin() {
+      const v = D.settings.vin || '';
+      if (!v) return;
+      const done = () => toast('차대번호를 복사했어요');
+      const fallback = () => {
+        const t = document.createElement('textarea');
+        t.value = v; t.style.position = 'fixed'; t.style.opacity = '0';
+        document.body.appendChild(t); t.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { /* 무시 */ }
+        t.remove();
+        if (ok) done(); else toast('복사하지 못했어요. 번호를 눌러 선택해서 복사하세요.');
+      };
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(v).then(done, fallback);
+      else fallback();
+    },
     logout() {
       call('logout', { token: SYNC.token }).catch(() => {});
       store.del(TOKEN_KEY); SYNC.token = '';
