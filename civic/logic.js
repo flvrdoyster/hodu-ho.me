@@ -195,8 +195,34 @@
     return out;
   }
 
+  const FUEL_WIN = 1000, FUEL_MIN = 1000;
+  function fuelStats(list) {
+    const rows = list.filter(f => f.km > 0 && f.liters > 0).sort((a, b) => a.km - b.km || (a.date || '').localeCompare(b.date || ''));
+    const cum = [0];
+    rows.forEach((f, i) => cum.push(cum[i] + f.liters));
+    const used = (i, j) => cum[j + 1] - cum[i] - (rows[i].liters + rows[j].liters) / 2;
+    const eco = {};
+    let recent = null, recentDist = null;
+    for (let j = 1; j < rows.length; j++) {
+      let i = j - 1;
+      while (i >= 0 && rows[j].km - rows[i].km < FUEL_WIN) i--;
+      if (i < 0) continue;
+      recentDist = rows[j].km - rows[i].km;
+      recent = recentDist / used(i, j);
+      eco[rows[j].id] = recent;
+    }
+    const n = rows.length, dist = n > 1 ? rows[n - 1].km - rows[0].km : 0;
+    const priced = list.filter(f => f.amount > 0 && f.liters > 0);
+    const money = priced.reduce((a, f) => a + f.amount, 0), liters = priced.reduce((a, f) => a + f.liters, 0);
+    return {
+      eco, recent, recentDist, dist,
+      avg: dist >= FUEL_MIN ? dist / used(0, n - 1) : null,
+      avgPrice: liters > 0 ? money / liters : null,
+    };
+  }
+
   const api = {
-    DAY, pd, ymd, addMonths, daysBetween, calcPart, inspectionWindow, careTips, weatherTips,
+    DAY, pd, ymd, addMonths, daysBetween, calcPart, inspectionWindow, careTips, weatherTips, fuelStats, FUEL_WIN, FUEL_MIN,
     REC_COLS, COL_KO, recordsToCSV, parseCSV, csvToRecords, mergeById, normDate, toNum,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

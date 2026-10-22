@@ -3,13 +3,14 @@ const TABS = [
   { key: 'parts', sheet: '교체주기', cols: [['id', 'id', 's'], ['name', '항목', 's'], ['intervalKm', '주기(km)', 'n'], ['intervalMonths', '주기(개월)', 'n'], ['lastDate', '마지막 교체일', 's'], ['lastKm', '마지막 교체 주행거리', 'n'], ['note', '메모', 's']] },
   { key: 'inspections', sheet: '종합검사', cols: [['id', 'id', 's'], ['date', '검사일', 's'], ['km', '주행거리', 'n'], ['result', '결과', 's'], ['nextDate', '다음 검사일', 's'], ['note', '메모', 's']] },
   { key: 'issues', sheet: '이슈', cols: [['id', 'id', 's'], ['text', '내용', 's'], ['status', '상태', 's'], ['since', '발견일', 's'], ['doneDate', '완료일', 's']] },
+  { key: 'fuel', sheet: '주유기록', cols: [['id', 'id', 's'], ['date', '날짜', 's'], ['km', '주행거리', 'n'], ['liters', '주유량(L)', 'n'], ['amount', '금액', 'n'], ['station', '주유소', 's'], ['fuelType', '유종', 's'], ['note', '메모', 's']] },
   { key: 'policies', sheet: '자동차보험', cols: [['id', 'id', 's'], ['insurer', '보험사', 's'], ['start', '시작일', 's'], ['end', '만기일', 's'], ['premium', '보험료', 'n'], ['payMethod', '납입방법', 's'], ['coverage', '가입담보', 'l'], ['terms', '특별약관', 'l'], ['mileageStartKm', '마일리지 최초 주행거리', 'n'], ['mileageStartDate', '최초 주행거리 확인일', 's'], ['mileageLimitKm', '마일리지 약정 상한', 'n'], ['note', '메모', 's']] },
 ];
 const SETTINGS = {
   sheet: '설정',
   rows: [['plate', '차량번호', 's'], ['model', '차종 표시', 's'], ['vin', '차대번호', 's'], ['currentKm', '현재 주행거리', 'n'], ['kmDate', '주행거리 기준일', 's'], ['area.name', '날씨 지역', 's'], ['area.lat', '날씨 위도', 'n'], ['area.lon', '날씨 경도', 'n']],
 };
-const CHOICES = { kind: ['repair', 'insurance', 'estimate'], shopType: ['honda', 'general'], status: ['open', 'done'] };
+const CHOICES = { kind: ['repair', 'insurance', 'estimate'], shopType: ['honda', 'general'], status: ['open', 'done'], fuelType: ['휘발유', '고급휘발유'] };
 const MAX_ROWS = 3000;
 const MAX_FAILS = 8;
 const FAIL_WINDOW = 10 * 60 * 1000;
@@ -63,8 +64,12 @@ function props() {
   return PropertiesService.getScriptProperties();
 }
 
+function password() {
+  return String(props().getProperty('PASSWORD') || '').trim();
+}
+
 function passwordFingerprint() {
-  const pw = props().getProperty('PASSWORD');
+  const pw = password();
   return pw ? sha('civic:' + pw) : '';
 }
 
@@ -84,7 +89,7 @@ function authed(token) {
 }
 
 function login(body) {
-  const pw = props().getProperty('PASSWORD');
+  const pw = password();
   if (!pw) return { ok: false, error: 'no-password' };
   const now = Date.now();
   let fails = [];
@@ -94,7 +99,7 @@ function login(body) {
     fails = [];
   }
   if (fails.length >= MAX_FAILS) return { ok: false, error: 'locked' };
-  if (String(body.password || '') !== pw) {
+  if (String(body.password || '').trim() !== pw) {
     fails.push(now);
     props().setProperty('FAILS', JSON.stringify(fails));
     Utilities.sleep(1000);
@@ -144,17 +149,21 @@ function tabColumns(sh, t) {
   return pos;
 }
 
+function isDate(v) {
+  return Object.prototype.toString.call(v) === '[object Date]';
+}
+
 function fmtDate(d) {
-  return Utilities.formatDate(d, 'Asia/Seoul', 'yyyy-MM-dd');
+  return Utilities.formatDate(d, SpreadsheetApp.getActive().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
 }
 
 function cast(v, type) {
   if (type === 'n') {
-    if (v === '' || v === null) return null;
+    if (v === '' || v === null || isDate(v) || (typeof v === 'string' && !v.trim())) return null;
     const n = Number(v);
     return isNaN(n) ? null : n;
   }
-  if (v instanceof Date) return fmtDate(v);
+  if (isDate(v)) return fmtDate(v);
   const s = v === null || v === undefined ? '' : String(v);
   if (type === 'l') return s.split('|').map(x => x.trim()).filter(Boolean);
   return s;

@@ -11,7 +11,7 @@
   const WRITE = new Set(['editKm', 'cancelKm', 'saveKm', 'new', 'edit', 'save', 'cancel', 'del', 'replaced', 'issueDone',
     'backup', 'restore', 'csvExport', 'csvImport', 'csvApply', 'csvClear', 'saveVehicle', 'logout', 'retry', 'seed', 'copyVin']);
   const ed = html => EDIT ? html : '';
-  const COLS = ['records', 'parts', 'inspections', 'issues', 'policies'];
+  const COLS = ['records', 'parts', 'inspections', 'issues', 'policies', 'fuel'];
   const KEYS = COLS.concat('settings');
 
   const store = {
@@ -21,7 +21,7 @@
   };
 
   function emptyData() {
-    return { records: [], parts: [], inspections: [], issues: [], policies: [], settings: { currentKm: 0, plate: '', model: '' } };
+    return { records: [], parts: [], inspections: [], issues: [], policies: [], fuel: [], settings: { currentKm: 0, plate: '', model: '' } };
   }
   function normalize(raw) {
     const d = emptyData();
@@ -168,7 +168,7 @@
     });
   }
 
-  const TABS_ALL = [['home', '요약'], ['parts', '교체 주기'], ['log', '정비 이력'], ['stats', '통계'], ['data', '데이터']];
+  const TABS_ALL = [['home', '요약'], ['parts', '교체 주기'], ['log', '정비 이력'], ['fuel', '주유'], ['stats', '통계'], ['data', '데이터']];
   const tabList = () => TABS_ALL.filter(t => EDIT || t[0] !== 'data');
   function renderTabs() {
     if (S.login || S.fatal) { $('#tabs').innerHTML = ''; return; }
@@ -315,7 +315,7 @@
     const recent = D.records.slice().sort(byDateDesc).slice(0, 3);
     const more = v => `<button class="btn ghost" data-act="tab" data-v="${v}">전체 보기</button>`;
 
-    return `<div class="kpis">
+    return `${ed('<div class="quick"><button class="btn primary" data-act="new" data-type="fuel">주유 추가</button></div>')}<div class="kpis">
       ${tile('종합검사', insp)}
       ${tile('자동차보험', policyHTML())}
       ${tile('소모품', parts, more('parts'))}
@@ -504,11 +504,62 @@
     });
   }
 
+  const kmpl = n => n == null ? '-' : n.toFixed(1);
+  const lit = n => (+Number(n).toFixed(2)).toString();
+  function fuelChart(rows) {
+    const W = 640, H = 220, Lm = 44, R = 14, T = 16, B = 28;
+    if (rows.length < 2) return null;
+    const t0 = pd(rows[0].date).getTime(), t1 = pd(rows[rows.length - 1].date).getTime();
+    const vmin = Math.min.apply(null, rows.map(r => r.v)), vmax = Math.max.apply(null, rows.map(r => r.v));
+    const lo = Math.max(0, Math.floor(vmin - 1)), hi = Math.ceil(vmax + 1);
+    const iw = W - Lm - R, ih = H - T - B;
+    const X = t => Lm + (t - t0) / Math.max(1, t1 - t0) * iw, Y = v => T + ih - (v - lo) / Math.max(1, hi - lo) * ih;
+    const step = Math.max(1, Math.ceil((hi - lo) / 4));
+    let g = '';
+    for (let v = lo; v <= hi; v += step) g += `<line class="gl" x1="${Lm}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text class="tick" x="${Lm - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
+    let xt = '';
+    const y0 = new Date(t0).getUTCFullYear(), y1 = new Date(t1).getUTCFullYear();
+    for (let y = y0 + 1; y <= y1; y++) {
+      const tt = Date.UTC(y, 0, 1);
+      xt += `<text class="tick" x="${X(tt)}" y="${H - 8}" text-anchor="middle">${y}</text><line class="ax" x1="${X(tt)}" x2="${X(tt)}" y1="${T + ih}" y2="${T + ih + 4}"/>`;
+    }
+    const pts = rows.map(r => ({ x: X(pd(r.date).getTime()), y: Y(r.v), html: `<b>${r.date}</b><br>${kmpl(r.v)}km/L` }));
+    const path = pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+    return { html: `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="연비 추이">${g}<line class="ax" x1="${Lm}" x2="${W - R}" y1="${T + ih}" y2="${T + ih}"/>${xt}<path class="ln" d="${path}"/>${pts.map(p => `<circle class="pt" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4"/>`).join('')}<circle class="hl" r="7" cx="-20" cy="-20"/></svg><div class="tip" hidden></div>`, pts, W };
+  }
+  function fuelHTML() {
+    const fs = L.fuelStats(D.fuel);
+    const list = D.fuel.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.km || 0) - (a.km || 0));
+    const yr = String(today().getUTCFullYear());
+    const yearSum = D.fuel.filter(f => (f.date || '').slice(0, 4) === yr).reduce((a, f) => a + (f.amount || 0), 0);
+    const ecoRows = D.fuel.filter(f => fs.eco[f.id] != null).sort((a, b) => (a.date || '').localeCompare(b.date || '')).map(f => ({ date: f.date, v: fs.eco[f.id] }));
+    const fc = fuelChart(ecoRows);
+    CH = fc ? [{ id: 'c3', c: fc }] : [];
+    const tile = (label, big, meta) => `<section class="panel tile"><h2 class="sec">${label}</h2><div class="big num">${big}</div><div class="meta muted">${meta}</div></section>`;
+    const add = ed('<button class="btn primary" data-act="new" data-type="fuel">주유 추가</button>');
+    if (!list.length) return `<div class="bar-row"><p class="hint">주유할 때마다 기록하면 연비와 주유비가 계산돼요.</p>${add}</div><div class="empty"><b>아직 주유 기록이 없어요</b>${ed('주유 추가로 첫 기록을 남기세요. 주행거리까지 적어 두면 기록이 쌓이면서 연비가 나와요.')}</div>`;
+    return `<div class="bar-row"><p class="hint">연비는 주유 사이에 달린 거리를 그 사이 넣은 기름 양으로 나눈 추정값이에요. 가득 주유가 아니면 탱크에 남은 양을 알 수 없어서, 거리가 짧을수록 오차가 크고 기록이 쌓일수록 정확해져요.</p>${add}</div>
+    <div class="kpis">
+      ${tile('평균 연비', fs.avg == null ? '-' : kmpl(fs.avg) + '<small>km/L</small>', fs.avg == null ? `주행거리가 ${fmt(L.FUEL_MIN)}km 넘게 쌓이면 나와요` : `기록 전체 ${fmt(fs.dist)}km 기준`)}
+      ${tile('최근 연비', fs.recent == null ? '-' : kmpl(fs.recent) + '<small>km/L</small>', fs.recent == null ? `약 ${fmt(L.FUEL_WIN)}km 이상 구간이 필요해요` : `최근 ${fmt(fs.recentDist)}km 기준`)}
+      ${tile(yr + '년 주유비', won(yearSum), `${D.fuel.filter(f => (f.date || '').slice(0, 4) === yr).length}회`)}
+      ${tile('L당 평균', fs.avgPrice == null ? '-' : fmt(Math.round(fs.avgPrice)) + '<small>원</small>', '금액 입력한 기록 기준')}
+    </div>
+    ${fc ? `<section style="margin-bottom:28px"><h2 class="sec">연비 추이 (km/L, 최근 약 ${fmt(L.FUEL_WIN)}km 기준)</h2><div class="cbox" id="c3">${fc.html}</div></section>` : ''}
+    <section><h2 class="sec">주유 내역</h2>
+    ${list.map(f => {
+      const price = f.amount > 0 && f.liters > 0 ? fmt(Math.round(f.amount / f.liters)) + '원/L' : '';
+      return `<div class="row"><div class="main"><div class="ttl">${esc(f.station || '주유')} <span class="date">${esc(f.date)}</span></div>
+        <div class="meta"><span class="num">${lit(f.liters)}L</span>${price ? ` · <span class="num">${price}</span>` : ''}${f.km ? ` · <span class="num">${fmt(f.km)}km</span>` : ''} · <span class="nw">${esc(f.fuelType || '')}</span>${f.note ? '<br>' + esc(f.note) : ''}</div></div>
+        <div class="end">${f.amount ? `<div class="num">${won(f.amount)}</div>` : ''}${ed(`<button class="btn ghost" data-act="edit" data-type="fuel" data-id="${esc(f.id)}">수정</button>`)}</div></div>`;
+    }).join('')}</section>`;
+  }
+
   function dataHTML() {
     const s = D.settings, p = S.pending;
     return `<p class="notice">고친 내용은 구글 시트에 저장돼요. 이 기기는 로그인한 기기라서 편집할 수 있고, 로그아웃하면 편집 권한이 사라져요.</p>
   <div class="grid"><div class="stack">
-   <section class="panel"><h3>백업</h3><p class="hint">정비 이력, 교체 주기, 종합검사, 자동차보험, 이슈, 설정 전체를 JSON 파일로 저장하거나 복원해요. 복원하면 지금 데이터가 모두 바뀌어요.</p>
+   <section class="panel"><h3>백업</h3><p class="hint">정비 이력, 교체 주기, 종합검사, 자동차보험, 주유 기록, 이슈, 설정 전체를 JSON 파일로 저장하거나 복원해요. 복원하면 지금 데이터가 모두 바뀌어요.</p>
      <div class="actions" style="margin-top:12px"><button class="btn primary" data-act="backup">백업 받기</button><button class="btn" data-act="restore">백업 불러오기</button></div></section>
    <section class="panel"><h3>구글 시트</h3><p class="hint">시트에서 직접 고쳐도 돼요. 이 페이지는 열 때 시트를 읽어 오고, 열어 둔 사이에 시트가 바뀌었으면 저장할 때 알려 줘요.</p>
      ${SYNC.sheetUrl ? `<div class="actions" style="margin-top:12px"><a class="btn" href="${esc(SYNC.sheetUrl)}" target="_blank" rel="noopener">시트 열기</a></div>` : ''}</section>
@@ -548,6 +599,11 @@
       { k: 'coverage', l: '가입담보 (줄바꿈으로 구분)', t: 'lines', w: 1 }, { k: 'terms', l: '특별약관 (줄바꿈으로 구분)', t: 'lines', w: 1 },
       { k: 'mileageStartKm', l: '마일리지 최초 주행거리(km)', t: 'num' }, { k: 'mileageStartDate', l: '최초 주행거리 확인일', t: 'date' },
       { k: 'mileageLimitKm', l: '마일리지 약정 상한(km)', t: 'num' }, { k: 'note', l: '메모', t: 'area', w: 1 }] },
+    fuel: { col: 'fuel', title: '주유 기록', fields: [
+      { k: 'date', l: '날짜', t: 'date', req: 1 }, { k: 'km', l: '주행거리(km)', t: 'num' },
+      { k: 'liters', l: '주유량(L)', t: 'num', req: 1, d: 1 }, { k: 'amount', l: '금액(원)', t: 'num' },
+      { k: 'station', l: '주유소', t: 'text' }, { k: 'fuelType', l: '유종', t: 'sel', o: [['휘발유', '휘발유'], ['고급휘발유', '고급휘발유']] },
+      { k: 'note', l: '메모', t: 'area', w: 1 }] },
     issue: { col: 'issues', title: '이슈', fields: [
       { k: 'text', l: '내용', t: 'area', req: 1, w: 1 }, { k: 'since', l: '발견일', t: 'date' }] },
   };
@@ -555,6 +611,7 @@
     if (type === 'record') return { date: todayStr(), km: curKm() || null, shopType: 'honda', kind: 'repair', items: [], amount: 0 };
     if (type === 'insp') return { date: todayStr(), km: curKm() || null, result: '적합' };
     if (type === 'issue') return { since: todayStr(), status: 'open' };
+    if (type === 'fuel') return { date: todayStr(), km: curKm() || null, fuelType: '휘발유' };
     return {};
   }
   function formHTML() {
@@ -565,7 +622,7 @@
       if (x.t === 'sel') inp = `<select id="f_${x.k}">${x.o.map(o => `<option value="${o[0]}" ${v === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>`;
       else if (x.t === 'area') inp = `<textarea id="f_${x.k}">${esc(v || '')}</textarea>`;
       else if (x.t === 'lines') inp = `<textarea id="f_${x.k}">${esc((v || []).join('\n'))}</textarea>`;
-      else if (x.t === 'num') inp = `<input id="f_${x.k}" type="number" inputmode="numeric" value="${v == null ? '' : esc(v)}">`;
+      else if (x.t === 'num') inp = `<input id="f_${x.k}" type="number" inputmode="${x.d ? 'decimal' : 'numeric'}"${x.d ? ' step="any"' : ''} value="${v == null ? '' : esc(v)}">`;
       else inp = `<input id="f_${x.k}" type="${x.t === 'date' ? 'date' : 'text'}" value="${esc(v || '')}">`;
       return `<label class="f ${x.w ? 'wide' : ''}">${x.l}${x.req ? ' *' : ''}${inp}</label>`;
     }).join('');
@@ -593,12 +650,14 @@
       if (x.t === 'num') v = v.trim() === '' ? null : Number(v);
       else if (x.t === 'lines') v = v.split('\n').map(s => s.trim()).filter(Boolean);
       else v = v.trim();
-      if (x.req && (v === '' || v == null || (Array.isArray(v) && !v.length))) { $('#formMsg').textContent = `${x.l} 항목이 필요해요.`; return; }
+      if (x.req && (v === '' || v == null || (Array.isArray(v) && !v.length) || (x.t === 'num' && !(v > 0)))) { $('#formMsg').textContent = `${x.l} 항목이 필요해요.`; return; }
       body[x.k] = v;
     }
     delete body.id;
+    if (body.km && curKm() && body.km - curKm() > 10000
+      && !window.confirm(`주행거리 ${fmt(body.km)}km는 현재(${fmt(curKm())}km)보다 ${fmt(body.km - curKm())}km 많아요. 맞나요?`)) return;
     upsert(F.col, E.id, body);
-    if (E.type === 'record' && body.kind !== 'estimate' && body.km > D.settings.currentKm) { D.settings.currentKm = body.km; D.settings.kmDate = body.date; }
+    if (((E.type === 'record' && body.kind !== 'estimate') || E.type === 'fuel') && body.km > D.settings.currentKm) { D.settings.currentKm = body.km; D.settings.kmDate = body.date; }
     if (!saveData()) return;
     S.editing = null; render();
   }
@@ -769,7 +828,7 @@
     if (!D.records.length && !D.parts.length && !S.editing && S.tab !== 'data') {
       return `<div class="empty"><b>아직 기록이 없어요</b>${ed('정비 이력 탭에서 첫 기록을 추가하거나, 데이터 탭에서 백업 파일을 불러오세요.<div class="actions" style="margin-top:12px"><button class="btn primary" data-act="new" data-type="record">정비 추가</button><button class="btn" data-act="tab" data-v="data">데이터 탭</button></div>')}</div>`;
     }
-    return ({ home: homeHTML, parts: partsHTML, log: logHTML, stats: statsHTML, data: dataHTML })[S.tab]();
+    return ({ home: homeHTML, parts: partsHTML, log: logHTML, fuel: fuelHTML, stats: statsHTML, data: dataHTML })[S.tab]();
   }
   function render() {
     if (!S.loading && !S.login && !S.fatal) { renderVehicle(); renderHead(); }
@@ -780,7 +839,7 @@
     if (S.login) { $('#view').innerHTML = loginHTML(); return; }
     if (S.editing) { $('#view').innerHTML = formHTML(); return; }
     $('#view').innerHTML = bodyHTML();
-    if (S.tab === 'stats') CH.forEach(x => bindTip($('#' + x.id), x.c));
+    if (S.tab === 'stats' || S.tab === 'fuel') CH.forEach(x => bindTip($('#' + x.id), x.c));
   }
 
   document.addEventListener('click', e => {
