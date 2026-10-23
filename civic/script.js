@@ -602,7 +602,7 @@
     fuel: { col: 'fuel', title: '주유 기록', fields: [
       { k: 'date', l: '날짜', t: 'date', req: 1 }, { k: 'km', l: '주행거리(km)', t: 'num' },
       { k: 'liters', l: '주유량(L)', t: 'num', req: 1, d: 1 }, { k: 'amount', l: '금액(원)', t: 'num' },
-      { k: 'station', l: '주유소', t: 'text' }, { k: 'fuelType', l: '유종', t: 'sel', o: [['휘발유', '휘발유'], ['고급휘발유', '고급휘발유']] },
+      { k: 'station', l: '주유소', t: 'station' }, { k: 'fuelType', l: '유종', t: 'sel', o: [['휘발유', '휘발유'], ['고급휘발유', '고급휘발유']] },
       { k: 'note', l: '메모', t: 'area', w: 1 }] },
     issue: { col: 'issues', title: '이슈', fields: [
       { k: 'text', l: '내용', t: 'area', req: 1, w: 1 }, { k: 'since', l: '발견일', t: 'date' }] },
@@ -611,15 +611,21 @@
     if (type === 'record') return { date: todayStr(), km: curKm() || null, shopType: 'honda', kind: 'repair', items: [], amount: 0 };
     if (type === 'insp') return { date: todayStr(), km: curKm() || null, result: '적합' };
     if (type === 'issue') return { since: todayStr(), status: 'open' };
-    if (type === 'fuel') return { date: todayStr(), km: curKm() || null, fuelType: '휘발유' };
+    if (type === 'fuel') return { date: todayStr(), km: curKm() || null, fuelType: '휘발유', station: stations()[0] || '' };
     return {};
   }
+  const stations = () => L.stationChoices(D.fuel, D.settings.stations);
   function formHTML() {
     const E = S.editing, F = FORMS[E.type], d = E.data;
     const f = F.fields.map(x => {
       const v = d[x.k];
       let inp;
       if (x.t === 'sel') inp = `<select id="f_${x.k}">${x.o.map(o => `<option value="${o[0]}" ${v === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>`;
+      else if (x.t === 'station') {
+        const opts = stations(), custom = !v || opts.indexOf(v) < 0;
+        inp = `<select id="f_${x.k}">${opts.map(o => `<option value="${esc(o)}" ${!custom && v === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}<option value="" ${custom ? 'selected' : ''}>직접 입력</option></select>`
+          + `<input id="f_${x.k}_custom" type="text" placeholder="주유소 이름" value="${custom ? esc(v || '') : ''}"${custom ? '' : ' hidden'}>`;
+      }
       else if (x.t === 'area') inp = `<textarea id="f_${x.k}">${esc(v || '')}</textarea>`;
       else if (x.t === 'lines') inp = `<textarea id="f_${x.k}">${esc((v || []).join('\n'))}</textarea>`;
       else if (x.t === 'num') inp = `<input id="f_${x.k}" type="number" inputmode="${x.d ? 'decimal' : 'numeric'}"${x.d ? ' step="any"' : ''} value="${v == null ? '' : esc(v)}">`;
@@ -641,6 +647,17 @@
     list.push(Object.assign({}, body, { id: nid }));
     return nid;
   }
+  function openForm(e) {
+    S.editing = e; S.returnY = window.scrollY;
+    render();
+    const t = $('#tabs');
+    if (t) window.scrollTo(0, Math.max(0, t.getBoundingClientRect().top + window.scrollY - 8));
+  }
+  function closeForm() {
+    S.editing = null;
+    render();
+    window.scrollTo(0, S.returnY || 0);
+  }
   function saveForm() {
     const E = S.editing, F = FORMS[E.type], body = Object.assign({}, E.data);
     for (const x of F.fields) {
@@ -648,6 +665,7 @@
       if (!el) continue;
       let v = el.value;
       if (x.t === 'num') v = v.trim() === '' ? null : Number(v);
+      else if (x.t === 'station') v = (v || $('#f_' + x.k + '_custom').value).trim();
       else if (x.t === 'lines') v = v.split('\n').map(s => s.trim()).filter(Boolean);
       else v = v.trim();
       if (x.req && (v === '' || v == null || (Array.isArray(v) && !v.length) || (x.t === 'num' && !(v > 0)))) { $('#formMsg').textContent = `${x.l} 항목이 필요해요.`; return; }
@@ -659,7 +677,7 @@
     upsert(F.col, E.id, body);
     if (((E.type === 'record' && body.kind !== 'estimate') || E.type === 'fuel') && body.km > D.settings.currentKm) { D.settings.currentKm = body.km; D.settings.kmDate = body.date; }
     if (!saveData()) return;
-    S.editing = null; render();
+    closeForm();
   }
 
   function download(name, text, type) {
@@ -766,21 +784,20 @@
       if (!saveData()) return;
       S.kmEdit = false; render();
     },
-    new(b) { S.editing = { type: b.dataset.type, id: null, data: formDefaults(b.dataset.type) }; render(); window.scrollTo(0, 0); },
+    new(b) { openForm({ type: b.dataset.type, id: null, data: formDefaults(b.dataset.type) }); },
     edit(b) {
       const F = FORMS[b.dataset.type], d = D[F.col].find(x => x.id === b.dataset.id);
       if (!d) return;
-      S.editing = { type: b.dataset.type, id: d.id, data: Object.assign({}, d) };
-      render(); window.scrollTo(0, 0);
+      openForm({ type: b.dataset.type, id: d.id, data: Object.assign({}, d) });
     },
     save() { saveForm(); },
-    cancel() { S.editing = null; render(); },
+    cancel() { closeForm(); },
     del(b) {
       if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = '한 번 더 누르면 삭제'; return; }
       const E = S.editing, col = FORMS[E.type].col;
       D[col] = D[col].filter(x => x.id !== E.id);
       if (!saveData()) return;
-      S.editing = null; render();
+      closeForm();
     },
     replaced(b) {
       const km = curKm();
@@ -851,6 +868,11 @@
   });
   document.addEventListener('change', e => {
     if (e.target.id === 'incIns') { S.incIns = e.target.checked; render(); }
+    if (e.target.id === 'f_station') {
+      const c = $('#f_station_custom');
+      c.hidden = e.target.value !== '';
+      if (!c.hidden) c.focus();
+    }
     if (e.target.id === 'file' && e.target.files[0]) onFile(e.target.files[0]);
   });
   document.addEventListener('keydown', e => { if (EDIT && e.key === 'Enter' && e.target.id === 'kmInput') H.saveKm(); });

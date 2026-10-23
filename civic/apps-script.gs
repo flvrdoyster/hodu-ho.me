@@ -8,7 +8,7 @@ const TABS = [
 ];
 const SETTINGS = {
   sheet: '설정',
-  rows: [['plate', '차량번호', 's'], ['model', '차종 표시', 's'], ['vin', '차대번호', 's'], ['currentKm', '현재 주행거리', 'n'], ['kmDate', '주행거리 기준일', 's'], ['area.name', '날씨 지역', 's'], ['area.lat', '날씨 위도', 'n'], ['area.lon', '날씨 경도', 'n']],
+  rows: [['plate', '차량번호', 's'], ['model', '차종 표시', 's'], ['vin', '차대번호', 's'], ['currentKm', '현재 주행거리', 'n'], ['kmDate', '주행거리 기준일', 's'], ['area.name', '날씨 지역', 's'], ['area.lat', '날씨 위도', 'n'], ['area.lon', '날씨 경도', 'n'], ['stations', '자주 가는 주유소', 'l']],
 };
 const CHOICES = { kind: ['repair', 'insurance', 'estimate'], shopType: ['honda', 'general'], status: ['open', 'done'], fuelType: ['휘발유', '고급휘발유'] };
 const MAX_ROWS = 3000;

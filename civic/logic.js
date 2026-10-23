@@ -221,8 +221,29 @@
     };
   }
 
+  function stationChoices(fuel, favorites) {
+    const m = new Map();
+    fuel.forEach(f => {
+      const n = String(f.station || '').trim();
+      if (!n) return;
+      const e = m.get(n) || { n, c: 0, last: '', fav: false };
+      e.c++;
+      if ((f.date || '') > e.last) e.last = f.date || '';
+      m.set(n, e);
+    });
+    (favorites || []).forEach(s => {
+      const n = String(s || '').trim();
+      if (!n) return;
+      if (!m.has(n)) m.set(n, { n, c: 0, last: '', fav: true });
+      else m.get(n).fav = true;
+    });
+    return [...m.values()].filter(e => e.c >= 2 || e.fav)
+      .sort((a, b) => b.c - a.c || b.last.localeCompare(a.last) || a.n.localeCompare(b.n, 'ko'))
+      .map(e => e.n);
+  }
+
   const api = {
-    DAY, pd, ymd, addMonths, daysBetween, calcPart, inspectionWindow, careTips, weatherTips, fuelStats, FUEL_WIN, FUEL_MIN,
+    DAY, pd, ymd, addMonths, daysBetween, calcPart, inspectionWindow, careTips, weatherTips, fuelStats, FUEL_WIN, FUEL_MIN, stationChoices,
     REC_COLS, COL_KO, recordsToCSV, parseCSV, csvToRecords, mergeById, normDate, toNum,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
