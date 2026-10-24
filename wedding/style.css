@@ -318,17 +318,12 @@ body {
   color: var(--ink-soft);
 }
 
-/* 버튼은 .btn 원형 그대로. 한 줄에 2개씩 나눠 담아 폭을 넘기지 않는다 */
 .loc__actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-}
-
-.loc__actions-row {
-  display: flex;
-  gap: 8px;
+  width: 100%;
+  text-align: center;
 }
 
 /* Calendar */

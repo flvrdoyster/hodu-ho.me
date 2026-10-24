@@ -244,6 +244,7 @@ background: var(--surface); color: var(--ink); font-size: var(--text-base);
 확장할 때 `.btn`의 패딩·폰트 크기를 덮어쓰지 않는다. 폭이 부족하면 **개수를 줄이거나 세로로 쌓는다.**
 
 > **가로 배치 한계:** 가용 폭 311~356px에서 `.btn` 기본 패딩(좌우 16px) + 1rem 한글 라벨 기준, **한 줄에 안전한 버튼은 2개까지**다. 3개 이상이 필요하면 세로 스택 또는 2열 그리드로 간다.
+> 예: 오시는 길의 지도 버튼 4개(`.loc__actions`)는 `grid-template-columns: 1fr 1fr` 전체 폭 그리드다. 줄마다 폭이 달라지지 않는다.
 
 **③ 텍스트/약한 버튼** — 목록 확장 등
 `.guestbook__more` — 전체 폭 아웃라인이되 `--text-caption`, `color: var(--ink-mute)`
