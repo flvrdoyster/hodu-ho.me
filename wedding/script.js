@@ -156,7 +156,10 @@
   const guestsField = document.getElementById('rsvpGuestsField');
   const guestsCount = document.getElementById('rsvpGuests');
 
-  if (localStorage.getItem('rsvp_submitted')) {
+  let rsvpSubmitted = null;
+  try { rsvpSubmitted = localStorage.getItem('rsvp_submitted'); } catch {}
+
+  if (rsvpSubmitted) {
     rsvpForm?.remove();
     if (rsvpDone) rsvpDone.hidden = false;
   } else if (rsvpForm) {
@@ -202,7 +205,7 @@
             body: JSON.stringify(data),
           });
         }
-        localStorage.setItem('rsvp_submitted', '1');
+        try { localStorage.setItem('rsvp_submitted', '1'); } catch {}
         rsvpForm.remove();
         rsvpDone.hidden = false;
         if (attendance === '참석' && message) {
