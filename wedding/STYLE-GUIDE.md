@@ -290,6 +290,7 @@ border-bottom: 1px solid var(--line-item);
 3열 그리드 `gap: 6px`, 항목은 `aspect-ratio: 1/1` + `object-fit: cover`.
 가로로 긴 사진만 `.gallery__item--contain`으로 `object-fit: contain` (JS의 `GALLERY` 배열에서 `fit: 'contain'`으로 지정).
 라이트박스: 흰색 97% 스크림 + blur(4px), 이미지 `scale(0.98) → 1`, 열릴 때 `body.no-scroll`.
+좌우로 40px 이상, 세로보다 크게 밀면 이전·다음 사진으로 넘어간다. 탭하면 닫힌다. 확대(핀치 줌)는 지원하지 않는다.
 
 ### 5.7 비디오 (식전 영상)
 
