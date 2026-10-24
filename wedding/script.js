@@ -49,19 +49,30 @@
   // Live D-day
   const ddayEl = document.querySelector('.dday');
   if (ddayEl) {
-    const ceremony = new Date('2026-11-28T11:00:00');
+    const ceremony = new Date('2026-11-28T11:00:00+09:00');
+    const kstDay = (t) => Math.floor((t + 9 * 3_600_000) / 86_400_000);
     const pad = (n) => String(n).padStart(2, '0');
+    let timer;
     const updateDday = () => {
-      const diff = ceremony - new Date();
-      if (diff <= 0) { ddayEl.textContent = 'D-DAY'; return; }
-      const d = Math.floor(diff / 86_400_000);
-      const h = Math.floor((diff % 86_400_000) / 3_600_000);
-      const m = Math.floor((diff % 3_600_000) / 60_000);
-      const s = Math.floor((diff % 60_000) / 1_000);
-      ddayEl.textContent = `D-${d} · ${pad(h)}:${pad(m)}:${pad(s)}`;
+      const now = Date.now();
+      const days = kstDay(ceremony.getTime()) - kstDay(now);
+      if (days < 0) {
+        ddayEl.hidden = true;
+        clearInterval(timer);
+        return;
+      }
+      const diff = ceremony - now;
+      let clock = '';
+      if (diff > 0) {
+        const h = Math.floor((diff % 86_400_000) / 3_600_000);
+        const m = Math.floor((diff % 3_600_000) / 60_000);
+        const s = Math.floor((diff % 60_000) / 1_000);
+        clock = ` · ${pad(h)}:${pad(m)}:${pad(s)}`;
+      }
+      ddayEl.textContent = (days === 0 ? 'D-DAY' : `D-${days}`) + clock;
     };
     updateDday();
-    setInterval(updateDday, 1_000);
+    if (!ddayEl.hidden) timer = setInterval(updateDday, 1_000);
   }
 
   // Copy address
