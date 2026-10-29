@@ -284,10 +284,10 @@
     return new Promise((resolve, reject) => {
       const cbName = `gbCb${Date.now()}${Math.random().toString(36).slice(2)}`;
       const script = document.createElement('script');
-      const timer = setTimeout(() => { cleanup(); reject(new Error('guestbook timeout')); }, 8000);
+      const timer = setTimeout(() => { cleanup(); reject(new Error('guestbook timeout')); }, 15000);
       function cleanup() {
         clearTimeout(timer);
-        delete window[cbName];
+        window[cbName] = () => {};
         script.remove();
       }
       window[cbName] = (data) => { cleanup(); resolve(data); };
@@ -322,23 +322,39 @@
   const guestbookList = document.getElementById('guestbookList');
   const guestbookMore = document.getElementById('guestbookMore');
 
+  async function requestGuestbook() {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, 3000));
+      try {
+        const res = await fetchGuestbookJSONP(APPS_SCRIPT_URL);
+        if (res && res.result === 'ok' && Array.isArray(res.items)) return res.items;
+      } catch {}
+    }
+    return null;
+  }
+
+  let guestbookRetryArmed = false;
+
   async function loadGuestbook(force) {
     if (!guestbookSection || !guestbookList || !guestbookMore || !APPS_SCRIPT_URL) return;
 
     let items = force ? null : readGuestbookCache();
     if (!items) {
-      try {
-        const res = await fetchGuestbookJSONP(APPS_SCRIPT_URL);
-        if (res && res.result === 'ok' && Array.isArray(res.items)) {
-          items = res.items;
-          writeGuestbookCache(items);
+      items = await requestGuestbook();
+      if (!items) {
+        if (!guestbookRetryArmed) {
+          guestbookRetryArmed = true;
+          window.addEventListener('online', () => {
+            guestbookRetryArmed = false;
+            loadGuestbook(true);
+          }, { once: true });
         }
-      } catch {
-        items = null; // 실패 시 섹션은 계속 숨김 상태 유지
+        return;
       }
+      writeGuestbookCache(items);
     }
 
-    if (!items || items.length === 0) {
+    if (items.length === 0) {
       guestbookSection.hidden = true;
       return;
     }
