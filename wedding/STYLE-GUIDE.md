@@ -39,8 +39,8 @@
 | `--line-section` | `#e5e5e5` | **섹션 구분선** (점선, `.section + .section`) |
 | `--line-item` | `#f2f2f2` | **항목 구분선** — 계좌·방명록 리스트, 아코디언 토글 하단 |
 | `--surface` | `#ffffff` | 표면 — body, 버튼 배경, 커버 그라디언트 하단 |
-| `--surface-sunken` | `#fafafa` | 선택 상태 배경 (`.rsvp__btn.is-active`), 안내 박스 배경 (`.loc__notice`, §5.8) |
-| `--surface-placeholder` | `#f0f0f0` | 갤러리 썸네일 로딩 전 배경 |
+| `--surface-sunken` | `#fafafa` | 선택 상태 배경 (`.rsvp__btn.is-active`) |
+| `--surface-placeholder` | `#f0f0f0` | 갤러리 썸네일 로딩 전 배경, 안내 박스 배경 (`.loc__notice`, §5.8) |
 | `--scrim` | `rgba(255,255,255,0.97)` | 라이트박스 배경 (+ `backdrop-filter: blur(4px)`) |
 | `--accent` | `#ffef50` | **유일한 유채색** — 달력의 예식일 원. 표지 부케에서 가져왔다 |
 
@@ -207,7 +207,7 @@ body
 | `1px dashed var(--line-section)` | 섹션 사이 (`.section + .section`, 자동 적용) |
 | `1px solid var(--line-item)` | 반복 항목 사이 — 계좌·방명록 리스트, 아코디언 토글 하단 |
 
-반대로 **단발성 부가 텍스트에는 선을 긋지 않는다.** 기존 종속 텍스트는 예외 없이 **색 + 크기만으로** 종속을 표현한다.
+반대로 **단발성 부가 텍스트에는 선을 긋지 않는다.** 기존 종속 텍스트는 **색 + 크기만으로** 종속을 표현한다. 유일한 예외는 놓치면 안 되는 실무 안내를 면으로 구획하는 안내 박스(`.loc__notice`, §5.8)다.
 
 | 요소 | 표현 |
 |---|---|
@@ -308,7 +308,7 @@ border-bottom: 1px solid var(--line-item);
 ### 5.8 안내 박스 (`.loc__notice`)
 
 하객이 놓치면 안 되는 단발성 실무 안내(예: 대절 버스 출발 시각·장소)를 위한 박스. §4.3의 "부가 텍스트는 색+크기만" 규칙의 **의도된 예외**로, 읽혀야 하는 안내라서 면으로 구획한다.
-- 배경 `--surface-sunken`, 모서리 `--radius-lg`, 패딩 `12px 16px`, 보더·그림자 없음.
+- 배경 `--surface-placeholder`, 모서리 `--radius-lg`, 패딩 `12px 16px`, 보더·그림자 없음.
 - 위 여백 `margin-top: 8px` — 부모 gap `16px`과 합쳐 블록 그룹 간격 `24px`이 되도록 한다.
 - 글자 `--text-caption` / `--ink` / 행간 `1.6`, 왼쪽 정렬.
 - 섹션당 하나까지. 여러 개 쌓으면 강조가 사라진다. 양해·거절성 안내(화환 사양 등)에는 쓰지 않는다 (§4.1).
