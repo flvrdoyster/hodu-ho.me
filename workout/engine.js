@@ -62,6 +62,9 @@
     const step = (inc > 0 ? '+' : '') + inc + (def.unit === 'lb' ? 'lb' : 'kg');
 
     if (sets.every((s) => s.reps >= max)) {
+      if (sets.length < def.default_sets) {
+        return { weight: w, reps: max, reason: txt + ' 상한 달성, 세트 수 부족 → 무게 유지' };
+      }
       if (sets.some((s) => s.feel === 'heavy')) {
         return { weight: w, reps: max, reason: txt + ' 상한 달성, 체감 무거움 → 증량 한 세션 미룸' };
       }
@@ -79,6 +82,26 @@
       return { weight: w, reps: Math.min(max, low + 1), reason: txt + ' 범위 안 → 무게 유지, 목표 +1회' };
     }
     return { weight: w, reps: min, reason: txt + ', 하한 미달 1세트 → 무게 유지' };
+  }
+
+  function linearRule(def, hist) {
+    const reps = def.rep_range[0];
+    const last = atWorkingWeight(hist[0].ex);
+    if (!last.sets.length) return { weight: def.baseline, reps, reason: '지난 세션 본세트 없음 → 등록된 작업 무게 ' + fmtW(def, def.baseline) };
+    const w = last.w;
+    const txt = '지난 세션 ' + repsText(def, w, last.sets);
+    const missed = (sets) => sets.some((s) => s.reps < reps);
+    if (!missed(last.sets)) {
+      if (last.sets.length < def.default_sets) return { weight: w, reps, reason: txt + ' 달성, 세트 수 부족 → 무게 유지' };
+      if (last.sets.some((s) => s.feel === 'heavy')) return { weight: w, reps, reason: txt + ' 달성, 체감 무거움 → 증량 한 세션 미룸' };
+      return { weight: round(w + def.increment), reps, reason: txt + ' 전부 달성 → +' + def.increment + def.unit };
+    }
+    const prev = hist[1] && atWorkingWeight(hist[1].ex);
+    if (prev && prev.w === w && prev.sets.length && missed(prev.sets)) {
+      const down = Math.round(w * 0.9 / def.increment) * def.increment;
+      return { weight: round(down), reps, reason: txt + ', 2회 연속 ' + reps + '회 미달 → 10% 감량' };
+    }
+    return { weight: w, reps, reason: txt + ', ' + reps + '회 못 채운 세트 있음 → 무게 유지' };
   }
 
   function recommend(id, sessions) {
@@ -99,6 +122,8 @@
     }
 
     if (def.progression === 'double') return Object.assign(base, doubleRule(def, hist));
+
+    if (def.progression === 'linear') return Object.assign(base, linearRule(def, hist));
 
     const last = atWorkingWeight(hist[0].ex);
     const w = last.sets.length ? last.w : def.baseline;
