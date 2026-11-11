@@ -63,25 +63,25 @@
 
     if (sets.every((s) => s.reps >= max)) {
       if (sets.length < def.default_sets) {
-        return { weight: w, reps: max, reason: txt + ' 상한 달성, 세트 수 부족 → 무게 유지' };
+        return { weight: w, reps: max, reason: txt + ' 상한 달성, 세트 수 부족 → 무게 유지', kind: 'hold' };
       }
       if (sets.some((s) => s.feel === 'heavy')) {
-        return { weight: w, reps: max, reason: txt + ' 상한 달성, 체감 무거움 → 증량 한 세션 미룸' };
+        return { weight: w, reps: max, reason: txt + ' 상한 달성, 체감 무거움 → 증량 한 세션 미룸', kind: 'wait' };
       }
-      return { weight: round(w + inc), reps: min, reason: txt + ' 전부 상한 달성 → ' + step };
+      return { weight: round(w + inc), reps: min, reason: txt + ' 전부 상한 달성 → ' + step, kind: 'up' };
     }
     if (failCount(sets, min) >= 2) {
       const prev = hist[1] && atWorkingWeight(hist[1].ex);
       if (prev && prev.w === w && failCount(prev.sets, min) >= 2) {
-        return { weight: round(w - inc), reps: min, reason: txt + ', 2회 연속 하한 미달 → ' + (inc > 0 ? '-' : '+') + Math.abs(inc) + (def.unit === 'lb' ? 'lb' : 'kg') };
+        return { weight: round(w - inc), reps: min, reason: txt + ', 2회 연속 하한 미달 → ' + (inc > 0 ? '-' : '+') + Math.abs(inc) + (def.unit === 'lb' ? 'lb' : 'kg'), kind: 'down' };
       }
-      return { weight: w, reps: min, reason: txt + ', 하한 미달 세트 2개 이상 → 무게 유지' };
+      return { weight: w, reps: min, reason: txt + ', 하한 미달 세트 2개 이상 → 무게 유지', kind: 'fail' };
     }
     if (sets.every((s) => s.reps >= min)) {
       const low = Math.min(...sets.map((s) => s.reps));
-      return { weight: w, reps: Math.min(max, low + 1), reason: txt + ' 범위 안 → 무게 유지, 목표 +1회' };
+      return { weight: w, reps: Math.min(max, low + 1), reason: txt + ' 범위 안 → 무게 유지, 목표 +1회', kind: 'reps' };
     }
-    return { weight: w, reps: min, reason: txt + ', 하한 미달 1세트 → 무게 유지' };
+    return { weight: w, reps: min, reason: txt + ', 하한 미달 1세트 → 무게 유지', kind: 'fail' };
   }
 
   function linearRule(def, hist) {
@@ -92,16 +92,16 @@
     const txt = '지난 세션 ' + repsText(def, w, last.sets);
     const missed = (sets) => sets.some((s) => s.reps < reps);
     if (!missed(last.sets)) {
-      if (last.sets.length < def.default_sets) return { weight: w, reps, reason: txt + ' 달성, 세트 수 부족 → 무게 유지' };
-      if (last.sets.some((s) => s.feel === 'heavy')) return { weight: w, reps, reason: txt + ' 달성, 체감 무거움 → 증량 한 세션 미룸' };
-      return { weight: round(w + def.increment), reps, reason: txt + ' 전부 달성 → +' + def.increment + def.unit };
+      if (last.sets.length < def.default_sets) return { weight: w, reps, reason: txt + ' 달성, 세트 수 부족 → 무게 유지', kind: 'hold' };
+      if (last.sets.some((s) => s.feel === 'heavy')) return { weight: w, reps, reason: txt + ' 달성, 체감 무거움 → 증량 한 세션 미룸', kind: 'wait' };
+      return { weight: round(w + def.increment), reps, reason: txt + ' 전부 달성 → +' + def.increment + def.unit, kind: 'up' };
     }
     const prev = hist[1] && atWorkingWeight(hist[1].ex);
     if (prev && prev.w === w && prev.sets.length && missed(prev.sets)) {
       const down = Math.round(w * 0.9 / def.increment) * def.increment;
-      return { weight: round(down), reps, reason: txt + ', 2회 연속 ' + reps + '회 미달 → 10% 감량' };
+      return { weight: round(down), reps, reason: txt + ', 2회 연속 ' + reps + '회 미달 → 10% 감량', kind: 'down' };
     }
-    return { weight: w, reps, reason: txt + ', ' + reps + '회 못 채운 세트 있음 → 무게 유지' };
+    return { weight: w, reps, reason: txt + ', ' + reps + '회 못 채운 세트 있음 → 무게 유지', kind: 'fail' };
   }
 
   function recommend(id, sessions) {

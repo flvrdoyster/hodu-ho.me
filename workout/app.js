@@ -51,7 +51,7 @@
       target: { weight: rec.weight, reps: rec.reps, sets: rec.sets, rest_sec: rec.rest_sec, duration: rec.duration },
       reason: rec.reason,
       cur_weight: rec.weight, duration_min: rec.duration != null ? rec.duration : null,
-      sets: [], note: '',
+      base_sets: rec.sets, sets: [], note: '',
     };
   }
 
@@ -111,22 +111,68 @@
     return elapsedSec() + items().filter(strength).reduce((a, it) => a + leftSec(it), 0);
   }
 
-  function fitToTime() {
-    const limit = S.settings.target_min * 60;
-    let over = projectedSec() - limit;
+  const targetMin = () => D().target_min || S.settings.target_min;
+  const setSec = (it) => it.target.rest_sec + 40;
+  const planSec = (it) => it.target.sets * setSec(it);
+
+  function fitToTime(rebuild) {
+    const open = (it) => strength(it) && !it.sets.length && it.uid !== D().current;
+    if (rebuild) {
+      items().forEach((it) => {
+        if (it.auto && it.status === 'skipped') { it.status = 'pending'; it.auto = false; }
+        if (it.base_sets && open(it)) it.target.sets = it.base_sets;
+      });
+    }
+    let over = projectedSec() - targetMin() * 60;
     const cut = [];
+    const trimmed = [];
+    const back = items().slice().reverse();
     ['optional', 'main'].forEach((pr) => {
-      items().slice().reverse().forEach((it) => {
-        if (over <= 0 || !strength(it) || it.priority !== pr || it.keep || it.sets.length || it.uid === D().current) return;
+      back.forEach((it) => {
+        if (over <= 0 || !open(it) || it.priority !== pr || it.keep) return;
         it.status = 'skipped';
+        it.auto = true;
         over -= leftSec(it);
         cut.push(def(it).name);
       });
     });
-    return cut;
+    let changed = true;
+    while (over > 0 && changed) {
+      changed = false;
+      back.forEach((it) => {
+        if (over <= 0 || !open(it) || it.target.sets <= 2) return;
+        it.target.sets--;
+        over -= setSec(it);
+        changed = true;
+        if (trimmed.indexOf(def(it).name) < 0) trimmed.push(def(it).name);
+      });
+    }
+    return { cut: cut.reverse(), trimmed: trimmed.reverse() };
   }
 
-  const timeUp = () => D().phase === 'active' && elapsedSec() >= S.settings.target_min * 60;
+  const timeUp = () => D().phase === 'active' && elapsedSec() >= targetMin() * 60;
+
+  function bandHTML() {
+    const list = items().filter(strength);
+    const planned = list.reduce((a, it) => a + Math.max(planSec(it), workDone(it) * setSec(it)), 0);
+    const scale = Math.max(targetMin() * 60, planned, 1);
+    const segs = list.map((it) => {
+      const sec = Math.max(planSec(it), workDone(it) * setSec(it));
+      const fill = Math.min(1, workDone(it) / Math.max(1, it.target.sets));
+      return '<span class="band__seg' + (D().phase === 'active' && it.uid === D().current ? ' is-current' : '') + '" style="flex:' + sec + ' 0 0"><span class="band__fill" style="width:' + (fill * 100) + '%"></span></span>';
+    }).join('');
+    const free = scale - planned;
+    const tick = D().phase === 'active' ? '<span class="band__tick' + (timeUp() ? ' is-over' : '') + '" id="bandTick" data-scale="' + scale + '" style="left:' + Math.min(100, elapsedSec() / scale * 100) + '%"></span>' : '';
+    return '<div class="band" role="img" aria-label="시간 배분">' + segs + (free > 0 ? '<span class="band__free" style="flex:' + free + ' 0 0"></span>' : '') + tick + '</div>';
+  }
+
+  function timeCardHTML() {
+    const planned = Math.round(items().filter(strength).reduce((a, it) => a + planSec(it), 0) / 60);
+    const cut = items().filter((it) => it.auto && it.status === 'skipped').length;
+    const run = D().phase === 'active';
+    return '<div class="card timecard">' + stepper('운동 시간', 'time', targetMin() + '분') + bandHTML() +
+      '<p class="muted small">' + (run ? '경과 ' + Math.floor(elapsedSec() / 60) + '분 · ' : '') + '근력 예상 ' + planned + '분' + (cut ? ' · 시간에 맞춰 뺀 운동 ' + cut + '개' : '') + '</p></div>';
+  }
 
   function remember() { undoStack.push({ reps: ui.reps, filled: ui.filled }); }
 
@@ -174,7 +220,7 @@
     return t.running ? Math.max(0, Math.ceil((t.endsAt - Date.now()) / 1000)) : t.remaining;
   }
 
-  const elapsedText = () => Math.floor(elapsedSec() / 60) + '/' + S.settings.target_min + '분';
+  const elapsedText = () => Math.floor(elapsedSec() / 60) + '/' + targetMin() + '분';
 
   const mmss = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 
@@ -183,6 +229,11 @@
     if (clock && S.draft) {
       clock.textContent = elapsedText();
       clock.classList.toggle('is-over', timeUp());
+    }
+    const tick = document.getElementById('bandTick');
+    if (tick && S.draft) {
+      tick.style.left = Math.min(100, elapsedSec() / Number(tick.dataset.scale) * 100) + '%';
+      tick.classList.toggle('is-over', timeUp());
     }
     const t = ui.timer;
     if (!t.running) return;
@@ -328,7 +379,7 @@
       let status = '';
       if (live) status = '<span class="tag tag--' + (isCur ? 'active' : it.status) + '">' + (isCur ? '진행 중' : STATUS[it.status]) + '</span>';
       else if (it.priority === 'optional') status = '<span class="tag">선택</span>';
-      const sub = live && it.sets.length ? doneText(it) : targetText(it);
+      const sub = live && it.sets.length ? doneText(it) : targetText(it) + (mode === 'plan' && strength(it) ? ' · 약 ' + Math.round(planSec(it) / 60) + '분' : '');
       const jumpable = mode === 'list' && it.status !== 'skipped';
       const main = '<span class="row__name">' + esc(d.name) + status + '</span>' +
         '<span class="row__sub">' + esc(sub) + '</span>' +
@@ -365,16 +416,15 @@
       '<button type="button" class="btn btn--ghost btn--sm topbar__back" data-act="back-ex">‹ 운동으로</button>' +
       '<h1 class="topbar__title topbar__title--one">세션 목록 <span class="topbar__sub">' + done + '/' + active + ' 완료</span></h1>' +
       '<button type="button" class="btn btn--ghost btn--sm" data-act="list-edit">' + (editing ? '완료' : '편집') + '</button></header>' +
-      '<section class="stack">' + rowsHTML(editing ? 'edit' : 'list') +
+      '<section class="stack">' + timeCardHTML() + rowsHTML(editing ? 'edit' : 'list') +
       '<button type="button" class="btn" data-act="add">운동 추가</button>' +
       '<button type="button" class="btn" data-act="finish">세션 종료</button>' +
       '<button type="button" class="btn btn--danger" data-act="abandon">기록 버리고 처음으로</button></section>';
   }
 
   function planHTML() {
-    const min = E.estimateMin(items().filter((x) => !isCardio(x)));
-    return topbar(tplName(D().session_type) + ' 세션', D().date + ' · 근력 예상 ' + min + '분 · 목표 ' + S.settings.target_min + '분', '<button type="button" class="btn btn--ghost btn--sm" data-act="plan-cancel">취소</button>') +
-      '<section class="stack">' + rowsHTML('plan') +
+    return topbar(tplName(D().session_type) + ' 세션', D().date, '<button type="button" class="btn btn--ghost btn--sm" data-act="plan-cancel">취소</button>') +
+      '<section class="stack">' + timeCardHTML() + lastSessionHTML() + rowsHTML('plan') +
       '<button type="button" class="btn" data-act="add">운동 추가</button>' +
       '<button type="button" class="btn btn--primary btn--lg" data-act="plan-start">시작</button></section>';
   }
@@ -386,15 +436,17 @@
     const pos = active.findIndex((x) => x.uid === it.uid) + 1;
     const nx = nextPending(it.uid);
 
-    const progress = '<button type="button" class="progress" data-act="open-list">' +
+    const progress = '<button type="button" class="progress" data-act="open-list"><span class="progress__row">' +
       '<span class="progress__count">운동 ' + pos + '/' + active.length + '</span>' +
       '<span class="progress__next">' + (nx ? '다음 ' + esc(def(nx).name) : '마지막 운동') + '</span>' +
-      '<span class="progress__time' + (timeUp() ? ' is-over' : '') + '" id="elapsed">' + elapsedText() + '</span><span aria-hidden="true">›</span></button>';
+      '<span class="progress__time' + (timeUp() ? ' is-over' : '') + '" id="elapsed">' + elapsedText() + '</span><span aria-hidden="true">›</span></span>' + bandHTML() + '</button>';
 
-    const card = '<div class="card ex"><h2>' + esc(d.name) + '</h2>' + targetsHTML(it, d) + setsHTML(it) + '</div>';
+    const card = '<div class="card ex"><h2>' + esc(d.name) + '</h2>' + targetsHTML(it, d) + setsHTML(it) +
+      (ui.phase === 'rest' ? '<button type="button" class="set set--memo" data-act="note-edit"><span class="set__n">메모</span>' +
+      '<span class="set__note">' + (it.note ? esc(it.note) : '오늘 메모 추가') + '</span><span aria-hidden="true">›</span></button>' : '') + '</div>';
 
     const panel = ui.phase === 'rest' ? restHTML(it, nx) : inputHTML(it);
-    return '<section class="stack">' + progress + card + panel + prevHTML(it) + '</section>';
+    return '<section class="stack">' + progress + card + panel + lastMemoHTML(it) + prevHTML(it) + '</section>';
   }
 
   function stepper(label, act, val, note) {
@@ -412,18 +464,44 @@
       cell('횟수', it.target.reps + '회') + cell('세트', it.target.sets + '세트') + '</div>';
   }
 
+  function setRowHTML(d, s, label) {
+    return '<span class="set__n">' + label + '</span>' +
+      '<span class="set__v">' + esc(setText(d, s)) + '</span>' +
+      (s.feel ? '<span class="set__feel">' + FEEL[s.feel] + '</span>' : '') +
+      (s.note ? '<span class="set__note set__note--below">' + esc(s.note) + '</span>' : '');
+  }
+
   function setsHTML(it) {
     if (!it.sets.length || isCardio(it)) return '';
     const d = def(it);
     let n = 0;
-    return '<ol class="sets">' + it.sets.map((s, i) => {
-      const label = s.is_warmup ? '웜업' : (++n) + '세트';
-      return '<li><button type="button" class="set' + (s.is_warmup ? ' set--warm' : '') + '" data-act="edit-set" data-i="' + i + '">' +
-        '<span class="set__n">' + label + '</span>' +
-        '<span class="set__v">' + esc(setText(d, s)) + '</span>' +
-        (s.feel ? '<span class="set__feel">' + FEEL[s.feel] + '</span>' : '') +
-        '</button></li>';
-    }).join('') + '</ol>';
+    return '<ol class="sets">' + it.sets.map((s, i) => '<li><button type="button" class="set' + (s.is_warmup ? ' set--warm' : '') + '" data-act="edit-set" data-i="' + i + '">' +
+      setRowHTML(d, s, s.is_warmup ? '웜업' : (++n) + '세트') + '</button></li>').join('') + '</ol>';
+  }
+
+  function lastOf(id) {
+    const h = E.history(S.sessions, id)[0];
+    if (!h) return null;
+    const session = S.sessions.find((x) => (x.exercises || []).indexOf(h.ex) >= 0);
+    return { date: h.date, ex: h.ex, next: session && session.next_targets ? session.next_targets[id] : null };
+  }
+
+  function lastMemoHTML(it) {
+    const last = lastOf(it.exercise_type);
+    if (!last || (!last.ex.note && !last.next)) return '';
+    return '<div class="card memo-card"><span class="label">지난 메모 · ' + esc(last.date) + '</span>' +
+      (last.ex.note ? '<p>' + esc(last.ex.note) + '</p>' : '') +
+      (last.next ? '<p>다음 목표: ' + esc(last.next) + '</p>' : '') + '</div>';
+  }
+
+  function lastSessionHTML() {
+    const same = S.sessions.filter((x) => x.session_type === D().session_type);
+    const last = same[same.length - 1];
+    const watch = last && last.next_targets ? last.next_targets.watch : null;
+    if (!last || (!last.notes && !watch)) return '';
+    return '<div class="card memo-card"><span class="label">지난 ' + esc(tplName(last.session_type)) + ' 세션 메모 · ' + esc(last.date) + '</span>' +
+      (last.notes ? '<p>' + esc(last.notes) + '</p>' : '') +
+      (watch ? '<p>지켜볼 것: ' + esc(watch) + '</p>' : '') + '</div>';
   }
 
   function inputHTML(it) {
@@ -462,7 +540,7 @@
     const done = up || workDone(it) >= it.target.sets;
     const nextSet = '<button type="button" class="btn' + (done ? '' : ' btn--primary btn--lg') + '" data-act="next-set">' + (done ? '한 세트 더' : '다음 세트 시작') + '</button>';
     return '<div class="panel panel--rest">' + feel +
-      (up ? '<p class="note">목표 시간 ' + S.settings.target_min + '분이 됐어요.</p>' : '') +
+      (up ? '<p class="note">운동 시간 ' + targetMin() + '분이 됐어요.</p>' : '') +
       (ui.msg ? '<p class="note">' + esc(ui.msg) + '</p>' : '') +
       '<div class="timer"><span class="label">휴식</span><span class="timer__t" id="timerText">' + mmss(left) + '</span>' +
       '<div class="timer__track"><div class="timer__bar" id="timerBar" style="transform:scaleX(' + (t.total ? left / t.total : 0) + ')"></div></div></div>' +
@@ -482,10 +560,9 @@
     else {
       let n = 0;
       body = '<ol class="sets">' + (h.ex.sets || []).map((s) => '<li class="set set--static' + (s.is_warmup ? ' set--warm' : '') + '">' +
-        '<span class="set__n">' + (s.is_warmup ? '웜업' : (++n) + '세트') + '</span><span class="set__v">' + esc(setText(d, s)) + '</span>' +
-        (s.feel ? '<span class="set__feel">' + FEEL[s.feel] + '</span>' : '') + '</li>').join('') + '</ol>';
+        setRowHTML(d, s, s.is_warmup ? '웜업' : (++n) + '세트') + '</li>').join('') + '</ol>';
     }
-    return '<details class="card prev-wrap"><summary>직전 기록 · ' + esc(h.date) + '</summary>' + body + (h.ex.note ? '<p class="muted small">' + esc(h.ex.note) + '</p>' : '') + '</details>';
+    return '<details class="card prev-wrap"><summary>직전 기록 · ' + esc(h.date) + '</summary>' + body + '</details>';
   }
 
   function buildLog() {
@@ -516,6 +593,37 @@
     };
   }
 
+  function digestHTML(future) {
+    const lines = [];
+    const st = items().filter((it) => !isCardio(it));
+    const stamps = [];
+    st.forEach((it) => it.sets.forEach((x) => { if (x.at) stamps.push(new Date(x.at).getTime()); }));
+    if (stamps.length && D().started_at) {
+      const used = Math.max(1, Math.round((Math.max.apply(null, stamps) - new Date(D().started_at).getTime()) / 60000));
+      const over = used - targetMin();
+      lines.push('근력 ' + used + '분 · 운동 시간 ' + targetMin() + '분' + (over > 0 ? ' (' + over + '분 초과)' : ''));
+    }
+    const planned = st.filter((it) => it.status !== 'skipped' || it.auto).reduce((a, it) => a + (it.base_sets || it.target.sets), 0);
+    const done = st.reduce((a, it) => a + workDone(it), 0);
+    if (planned) lines.push('본세트 ' + done + '/' + planned);
+    const by = { up: [], fail: [], wait: [], down: [] };
+    st.forEach((it) => {
+      if (it.status === 'skipped' || !workDone(it)) return;
+      const rec = E.recommend(it.exercise_type, future);
+      if (by[rec.kind]) by[rec.kind].push(def(it).name + ' ' + E.fmtW(def(it), rec.weight));
+    });
+    if (by.up.length) lines.push('다음에 무게를 올리는 운동: ' + by.up.join(', '));
+    if (by.wait.length) lines.push('횟수는 채웠지만 무거워서 한 번 더 같은 무게: ' + by.wait.join(', '));
+    if (by.fail.length) lines.push('횟수를 못 채워 같은 무게로 다시: ' + by.fail.join(', '));
+    if (by.down.length) lines.push('두 번 연속 못 채워 무게를 내리는 운동: ' + by.down.join(', '));
+    const cut = st.filter((it) => it.auto && it.status === 'skipped').map((it) => def(it).name);
+    if (cut.length) lines.push('시간에 맞춰 뺀 운동: ' + cut.join(', '));
+    const short = st.filter((it) => it.status !== 'skipped' && it.base_sets && workDone(it) < it.base_sets && workDone(it) > 0).map((it) => def(it).name + ' ' + workDone(it) + '/' + it.base_sets);
+    if (short.length) lines.push('세트를 덜 한 운동: ' + short.join(', '));
+    if (!lines.length) return '';
+    return '<div class="card memo-card"><span class="label">오늘 정리</span><ul class="digest">' + lines.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></div>';
+  }
+
   function summaryHTML() {
     const log = buildLog();
     const future = S.sessions.concat([log]);
@@ -530,10 +638,11 @@
       const rec = E.recommend(it.exercise_type, future);
       const recText = d.unit === 'min' ? rec.duration + '분' : E.fmtW(d, rec.weight) + ' × ' + rec.reps + '회 × ' + rec.sets + '세트';
       return '<li class="sum"><span class="row__name">' + esc(d.name) + '</span><span class="row__sub">' + esc(lines) + '</span>' +
+        (it.note ? '<span class="row__sub">메모: ' + esc(it.note) + '</span>' : '') +
         '<span class="row__reason">다음 ' + esc(recText) + '</span></li>';
     }).join('');
     return topbar('세션 요약', log.date + ' · ' + log.duration_min + '분', '<button type="button" class="btn btn--ghost btn--sm" data-act="sum-back">돌아가기</button>') +
-      '<section class="stack"><ol class="rows">' + rows + '</ol>' +
+      '<section class="stack">' + digestHTML(future) + '<ol class="rows">' + rows + '</ol>' +
       '<label class="field"><span class="label">체중 (kg)</span><input class="input" type="number" inputmode="decimal" step="0.1" id="bw" value="' + esc(log.bodyweight_kg == null ? '' : log.bodyweight_kg) + '"></label>' +
       '<label class="field"><span class="label">메모</span><textarea class="input" id="notes" rows="3">' + esc(log.notes) + '</textarea></label>' +
       '<button type="button" class="btn btn--primary btn--lg" data-act="sum-save">저장</button></section>';
@@ -565,6 +674,10 @@
       html = sheetHead(k === 'swap' ? '운동 대체' : '운동 추가') + pickerHTML(k, ui.sheetArg);
     } else if (k === 'set') {
       html = sheetHead('세트 수정') + setFormHTML(ui.sheetArg);
+    } else if (k === 'note') {
+      html = sheetHead(def(cur()).name + ' 메모') + '<div class="stack-sm">' +
+        '<label class="field"><span class="label">오늘 메모</span><textarea class="input" id="exNote" rows="4">' + esc(cur().note || '') + '</textarea></label>' +
+        '<button type="button" class="btn btn--primary" data-act="note-save">저장</button></div>';
     } else if (k === 'settings') {
       html = sheetHead('설정') + settingsHTML();
     }
@@ -601,6 +714,7 @@
       '<label class="check"><input type="checkbox" id="fWu"' + (s.is_warmup ? ' checked' : '') + '> 웜업 세트</label>' +
       '<label class="field"><span class="label">체감</span><select class="select" id="fF"><option value="">없음</option>' +
       Object.keys(FEEL).map((k) => '<option value="' + k + '"' + (s.feel === k ? ' selected' : '') + '>' + FEEL[k] + '</option>').join('') + '</select></label>' +
+      '<label class="field"><span class="label">메모</span><input class="input" id="fN" type="text" value="' + esc(s.note || '') + '"></label>' +
       '<button type="button" class="btn btn--primary" data-act="set-save" data-i="' + i + '">저장</button>' +
       '<button type="button" class="btn btn--danger" data-act="set-del" data-i="' + i + '">세트 삭제</button></div>';
   }
@@ -610,7 +724,6 @@
     const last = S.sessions[S.sessions.length - 1];
     return '<div class="stack-sm">' +
       '<label class="field"><span class="label">체중 (kg)</span><input class="input" id="sBw" type="number" inputmode="decimal" step="0.1" value="' + esc(st.bodyweight_kg == null ? '' : st.bodyweight_kg) + '"></label>' +
-      '<label class="field"><span class="label">근력 운동 목표 시간 (분)</span><input class="input" id="sTarget" type="number" inputmode="numeric" min="10" step="5" value="' + S.settings.target_min + '"></label>' +
       '<label class="check"><input type="checkbox" id="sSound"' + (st.sound ? ' checked' : '') + '> 휴식 끝 소리</label>' +
       '<button type="button" class="btn btn--primary" data-act="settings-save">설정 저장</button>' +
       '<hr><p class="muted small">저장된 세션 ' + S.sessions.length + '개' + (last ? ' · 최근 ' + esc(last.date) : '') + '</p>' +
@@ -626,7 +739,15 @@
     window.scrollTo(0, 0);
   }
 
+  function setTime(min) {
+    D().target_min = Math.max(10, Math.min(120, min));
+    S.settings.target_min = D().target_min;
+    fitToTime(true);
+    save();
+  }
+
   function goTo(it) {
+    window.scrollTo(0, 0);
     D().current = it.uid;
     ui.phase = ui.timer.running ? 'rest' : 'input';
     ui.feelIdx = null;
@@ -638,8 +759,8 @@
     'new-session'(ds) {
       const date = today();
       const recs = E.buildSession(ds.type, S.sessions, date);
-      S.draft = { id: uid(), date, session_type: ds.type, phase: 'plan', current: null, items: recs.map(makeItem), notes: '' };
-      fitToTime();
+      S.draft = { id: uid(), date, session_type: ds.type, phase: 'plan', current: null, items: recs.map(makeItem), notes: '', target_min: S.settings.target_min };
+      fitToTime(true);
       save();
     },
     'plan-cancel'() {
@@ -656,6 +777,12 @@
       if (wakeLock) wakeLock.release();
       save();
     },
+    time(ds) { setTime(targetMin() + 5 * Number(ds.dir)); },
+    'time-edit'() {
+      const v = prompt('운동 시간 (분)', targetMin());
+      if (v == null || v.trim() === '' || isNaN(Number(v))) return;
+      setTime(Math.round(Number(v)));
+    },
     'plan-start'() {
       const first = items().find((x) => x.status === 'pending');
       if (!first) return toast('남은 운동이 없어요');
@@ -669,7 +796,7 @@
     },
     skip(ds) {
       const it = items()[idxOf(ds.uid)];
-      if (it.status === 'skipped') { it.status = it.sets.length ? 'done' : 'pending'; it.keep = true; save(); return; }
+      if (it.status === 'skipped') { it.status = it.sets.length ? 'done' : 'pending'; it.keep = true; it.auto = false; fitToTime(true); save(); return; }
       if (it.sets.length && !confirm('기록이 있는 운동이에요. 생략할까요? (기록은 저장되지 않아요)')) return;
       it.status = 'skipped';
       if (D().phase === 'active' && D().current === it.uid) {
@@ -677,6 +804,7 @@
         if (nx) goTo(nx);
         else { it.status = 'pending'; return toast('마지막 운동은 생략하지 말고 세션을 종료하세요'); }
       }
+      fitToTime(true);
       save();
     },
     swap(ds) {
@@ -697,6 +825,7 @@
         if (D().phase === 'active') list.splice(idxOf(D().current) + 1, 0, it);
         else list.push(it);
       }
+      fitToTime(true);
       save();
       closeSheet();
     },
@@ -733,13 +862,16 @@
       const it = cur();
       const reps = ui.reps;
       if (!reps) return toast('횟수를 먼저 입력해 주세요');
-      const set = { set_number: it.sets.length + 1, weight: it.cur_weight, reps, is_warmup: false, input_mode: ui.filled ? 'batch' : 'tap', feel: null };
+      const set = { set_number: it.sets.length + 1, weight: it.cur_weight, reps, is_warmup: false, input_mode: ui.filled ? 'batch' : 'tap', feel: null, at: new Date().toISOString() };
       const prev = it.sets.filter((s) => !s.is_warmup).pop();
       ui.msg = '';
       if (!set.is_warmup && prev && prev.reps > 0 && reps <= prev.reps * 0.6) ui.msg = '직전 세트보다 40% 넘게 줄었어요. 여기서 마무리해도 좋아요.';
       it.sets.push(set);
-      const cut = fitToTime();
-      if (cut.length) ui.msg = (ui.msg ? ui.msg + ' ' : '') + '목표 시간에 맞춰 뺀 운동: ' + cut.reverse().join(', ') + '. 세션 목록에서 되살릴 수 있어요.';
+      const fit = fitToTime();
+      const said = [];
+      if (fit.cut.length) said.push('뺀 운동: ' + fit.cut.join(', '));
+      if (fit.trimmed.length) said.push('세트를 줄인 운동: ' + fit.trimmed.join(', '));
+      if (said.length) ui.msg = (ui.msg ? ui.msg + ' ' : '') + '운동 시간에 맞췄어요. ' + said.join(' · ') + '.';
       ui.feelIdx = it.sets.length - 1;
       ui.phase = 'rest';
       resetCounters(it);
@@ -796,6 +928,7 @@
       if (it && (it.sets.length)) it.status = 'done';
       closeSheet();
       ui.screen = 'summary';
+      window.scrollTo(0, 0);
       save();
     },
     dur(ds) {
@@ -817,6 +950,12 @@
       save();
       toast(def(it).name + ' ' + it.duration_min + '분 기록');
     },
+    'note-edit'() { openSheet('note'); },
+    'note-save'() {
+      cur().note = document.getElementById('exNote').value.trim();
+      save();
+      closeSheet();
+    },
     'edit-set'(ds) { openSheet('set', Number(ds.i)); },
     'set-save'(ds) {
       const it = cur();
@@ -827,6 +966,8 @@
       s.reps = Math.max(0, parseInt(document.getElementById('fR').value, 10) || 0);
       s.is_warmup = document.getElementById('fWu').checked;
       s.feel = document.getElementById('fF').value || null;
+      const memo = document.getElementById('fN').value.trim();
+      if (memo) s.note = memo; else delete s.note;
       save();
       closeSheet();
     },
@@ -866,8 +1007,6 @@
       const bw = document.getElementById('sBw').value;
       S.settings.bodyweight_kg = bw === '' ? null : Number(bw);
       S.settings.sound = document.getElementById('sSound').checked;
-      const tm = parseInt(document.getElementById('sTarget').value, 10);
-      if (tm > 0) S.settings.target_min = tm;
       save();
       closeSheet();
       toast('설정을 저장했어요');
