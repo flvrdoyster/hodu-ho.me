@@ -196,14 +196,20 @@
     return 'over2';
   }
 
-  function estimateMin(items) {
-    let sec = 0;
-    items.forEach((it) => {
-      if (it.status === 'skipped') return;
-      if (C[it.exercise_type].unit === 'min') sec += (it.target.duration || 0) * 60;
-      else sec += it.target.sets * (it.target.rest_sec + 40);
-    });
-    return Math.round(sec / 60);
+  function gaps(sets) {
+    const t = (sets || []).filter((x) => x.at).map((x) => new Date(x.at).getTime());
+    const out = [];
+    for (let i = 1; i < t.length; i++) {
+      const g = (t[i] - t[i - 1]) / 1000;
+      if (g > 0 && g <= 600) out.push(g);
+    }
+    return out;
+  }
+
+  function setSec(id, sessions, current, fallback) {
+    const g = gaps(current);
+    for (const h of history(sessions, id).slice(0, 3)) g.push(...gaps(h.ex.sets));
+    return g.length ? Math.round(g.reduce((a, b) => a + b, 0) / g.length) : fallback;
   }
 
   function localDate(d) {
@@ -213,6 +219,6 @@
 
   window.Engine = {
     fmtW, convert, history, workSets, recommend, buildSession,
-    candidates, stage, estimateMin, localDate, PATTERN_NAME, round,
+    candidates, stage, setSec, localDate, PATTERN_NAME, round,
   };
 })();

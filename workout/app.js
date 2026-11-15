@@ -104,7 +104,7 @@
   }
 
   function leftSec(it) {
-    return Math.max(0, it.target.sets - workDone(it)) * (it.target.rest_sec + 40);
+    return Math.max(0, it.target.sets - workDone(it)) * setSec(it);
   }
 
   function projectedSec() {
@@ -112,7 +112,7 @@
   }
 
   const targetMin = () => D().target_min || S.settings.target_min;
-  const setSec = (it) => it.target.rest_sec + 40;
+  const setSec = (it) => E.setSec(it.exercise_type, S.sessions, it.sets, it.target.rest_sec + 40);
   const planSec = (it) => it.target.sets * setSec(it);
 
   function fitToTime(rebuild) {
