@@ -1,0 +1,79 @@
+{
+  "date": "2026-11-15",
+  "session_type": "lower",
+  "exercises": [
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": true,
+          "feel": "light",
+          "at": "2026-11-15T08:16:39.393Z",
+          "weight_kg": 40
+        },
+        {
+          "reps": 5,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-15T08:18:10.591Z",
+          "weight_kg": 70
+        },
+        {
+          "reps": 5,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-15T08:20:32.710Z",
+          "weight_kg": 75
+        },
+        {
+          "reps": 5,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-15T08:22:39.004Z",
+          "weight_kg": 75
+        },
+        {
+          "reps": 5,
+          "is_warmup": false,
+          "at": "2026-11-15T08:25:14.583Z",
+          "weight_kg": 75
+        }
+      ],
+      "exercise_id": "deadlift"
+    },
+    {
+      "sets": [
+        {
+          "reps": 7,
+          "is_warmup": false,
+          "feel": "heavy",
+          "at": "2026-11-15T08:28:21.403Z",
+          "weight_kg": 70
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-15T08:30:28.910Z",
+          "weight_kg": 80
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-15T08:32:49.236Z",
+          "weight_kg": 80
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "at": "2026-11-15T08:34:40.779Z",
+          "weight_kg": 80
+        }
+      ],
+      "exercise_id": "leg_press"
+    }
+  ],
+  "duration_sec": 3780,
+  "id": "legacy:2026-11-15:lower"
+}
