@@ -377,11 +377,13 @@
   document.addEventListener('pointerup', dragEnd);
   document.addEventListener('pointercancel', dragEnd);
 
-  function topbar(title, sub, right, left, sticky) {
-    return '<header class="topbar' + (sticky ? ' topbar--sticky' : '') + '">' + (left || '') + '<div class="topbar__title"><h1>' + esc(title) + '</h1>' + (sub ? '<p class="topbar__sub">' + esc(sub) + '</p>' : '') + '</div>' + (right || '') + '</header>';
-  }
+  const textBtn = (act, label) => '<button type="button" class="btn btn--ghost btn--sm" data-act="' + act + '">' + label + '</button>';
 
-  const settingsBtn = '<button type="button" class="btn btn--ghost btn--sm" data-act="settings">설정</button>';
+  function topbar(o) {
+    return '<header class="topbar">' + (o.left ? '<div class="topbar__l">' + o.left + '</div>' : '') +
+      '<div class="topbar__c">' + (o.band ? bandHTML() : '<h1>' + esc(o.title) + '</h1>') + '</div>' +
+      (o.right ? '<div class="topbar__r">' + o.right + '</div>' : '') + '</header>';
+  }
 
   function homeHTML() {
     const last = S.sessions[S.sessions.length - 1];
@@ -391,7 +393,7 @@
       lastHTML = '<p class="label">지난 세션</p><p><strong>' + esc(last.date) + '</strong> · ' + esc(tplName(last.session_type)) + (last.duration_sec ? ' · ' + Math.round(last.duration_sec / 60) + '분' : '') + '</p><p class="muted small">' + esc(names) + '</p>';
     }
     const btns = Object.keys(window.TEMPLATES).map((k) => '<button type="button" class="btn btn--primary btn--lg" data-act="new-session" data-type="' + k + '">' + esc(window.TEMPLATES[k].name) + ' 세션 만들기</button>').join('');
-    return topbar('운동 기록', today(), settingsBtn) + '<section class="stack">' + btns + '<div class="card">' + lastHTML + '</div></section>';
+    return topbar({ title: '운동 기록', right: textBtn('settings', '설정') }) + '<section class="stack stack--lead"><p class="lead">' + esc(today()) + '</p>' + btns + '<div class="card">' + lastHTML + '</div></section>';
   }
 
   function tplName(t) {
@@ -438,11 +440,7 @@
 
   function listHTML() {
     const editing = ui.editing;
-    const done = items().filter((x) => x.status === 'done').length;
-    const active = items().filter((x) => x.status !== 'skipped').length;
-    return topbar('세션 목록', done + '/' + active + ' 완료',
-      '<button type="button" class="btn btn--ghost btn--sm" data-act="list-edit">' + (editing ? '완료' : '편집') + '</button>',
-      '<button type="button" class="btn btn--ghost btn--sm topbar__back" data-act="back-ex">‹ 운동으로</button>', true) +
+    return topbar({ title: '세션 목록', left: textBtn('back-ex', '‹ 운동으로'), right: textBtn('list-edit', editing ? '완료' : '편집') }) +
       '<section class="stack">' + timeCardHTML() + rowsHTML(editing ? 'edit' : 'list') +
       '<button type="button" class="btn" data-act="add">운동 추가</button>' +
       '<button type="button" class="btn" data-act="finish">세션 종료</button>' +
@@ -450,8 +448,8 @@
   }
 
   function planHTML() {
-    return topbar(tplName(D().session_type) + ' 세션', D().date, '<button type="button" class="btn btn--ghost btn--sm" data-act="plan-cancel">취소</button>') +
-      '<section class="stack">' + timeCardHTML() + lastSessionHTML() + rowsHTML('plan') +
+    return topbar({ title: tplName(D().session_type) + ' 세션', right: textBtn('plan-cancel', '취소') }) +
+      '<section class="stack stack--lead"><p class="lead">' + esc(D().date) + '</p>' + timeCardHTML() + lastSessionHTML() + rowsHTML('plan') +
       '<button type="button" class="btn" data-act="add">운동 추가</button>' +
       '<button type="button" class="btn btn--primary btn--lg" data-act="plan-start">시작</button></section>';
   }
@@ -461,8 +459,6 @@
     const d = def(it);
     const nx = nextPending(it.uid);
 
-    const progress = '<div class="progress">' + bandHTML() + '<button type="button" class="btn btn--ghost btn--sm" data-act="open-list">목록</button></div>';
-
     const card = '<div class="card ex"><h2>' + esc(d.name) + '</h2>' + targetsHTML(it, d) + '</div>';
 
     const panel = ui.phase === 'rest' ? restHTML(it, nx) : inputHTML(it);
@@ -470,7 +466,7 @@
       '<span class="memo-row__t">' + (it.note ? esc(it.note) : '오늘 메모 추가') + '</span><span aria-hidden="true">›</span></button>' : '';
     const sets = setsHTML(it);
     const log = sets || memo ? '<div class="card ex-log">' + sets + memo + '</div>' : '';
-    return '<section class="stack stack--ex">' + progress + card + panel + log + lastMemoHTML(it) + prevHTML(it) + '</section>';
+    return topbar({ band: true, right: textBtn('open-list', '목록') }) + '<section class="stack">' + card + panel + log + lastMemoHTML(it) + prevHTML(it) + '</section>';
   }
 
   function stepper(label, act, val, note, off, extra) {
@@ -663,8 +659,8 @@
         (it.note ? '<span class="row__sub">메모: ' + esc(it.note) + '</span>' : '') +
         '<span class="row__reason">다음 ' + esc(recText) + '</span></li>';
     }).join('');
-    return topbar('세션 요약', log.date + ' · ' + Math.round(log.duration_sec / 60) + '분', '<button type="button" class="btn btn--ghost btn--sm" data-act="sum-back">돌아가기</button>') +
-      '<section class="stack">' + digestHTML(future) + '<ol class="rows">' + rows + '</ol>' +
+    return topbar({ title: '세션 요약', right: textBtn('sum-back', '돌아가기') }) +
+      '<section class="stack stack--lead"><p class="lead">' + esc(log.date + ' · ' + Math.round(log.duration_sec / 60) + '분') + '</p>' + digestHTML(future) + '<ol class="rows">' + rows + '</ol>' +
       '<label class="field"><span class="label">체중 (kg)</span><input class="input" type="number" inputmode="decimal" step="0.1" id="bw" value="' + esc(log.bodyweight_kg == null ? '' : log.bodyweight_kg) + '"></label>' +
       '<label class="field"><span class="label">메모</span><textarea class="input" id="notes" rows="3">' + esc(log.notes || '') + '</textarea></label>' +
       '<button type="button" class="btn btn--primary btn--lg" data-act="sum-save">저장</button></section>';
@@ -687,7 +683,7 @@
   sheet.addEventListener('close', () => { ui.sheetKind = null; ui.formKey = null; sheet.innerHTML = ''; });
 
   function sheetHead(title) {
-    return '<div class="sheet__head"><h2>' + esc(title) + '</h2><button type="button" class="btn btn--ghost btn--sm" data-act="close-sheet">닫기</button></div>';
+    return '<div class="sheet__head"><h2>' + esc(title) + '</h2>' + textBtn('close-sheet', '닫기') + '</div>';
   }
 
   function renderSheet() {
