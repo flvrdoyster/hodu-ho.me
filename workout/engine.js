@@ -1,7 +1,7 @@
 (function () {
-  const C = window.CATALOG;
+  const get = (id) => window.Catalog.get(id);
   const round = (x) => Math.round(x * 100) / 100;
-  const isNum = (s) => typeof s.weight === 'number' && isFinite(s.weight);
+  const isNum = (s) => typeof s.weight_kg === 'number' && isFinite(s.weight_kg);
   const eq = (a, b) => Math.abs(a - b) < 0.1;
   const KG_PER_LB = 0.45359237;
   let unit = 'kg';
@@ -30,32 +30,34 @@
     return kgToDisp(Math.abs(inc)) + unit;
   }
 
-  function eff(id, prefs) {
-    const base = C[id];
-    const p = (prefs && prefs[id]) || {};
-    const increment = typeof p.increment === 'number' && isFinite(p.increment) && p.increment !== 0 ? p.increment : base.increment;
-    return Object.assign({}, base, { id, increment, start: typeof p.start === 'number' ? p.start : null });
+  function eff(id, increments) {
+    const base = get(id);
+    const v = increments && increments[id];
+    const increment = typeof v === 'number' && isFinite(v) && v > 0 ? v : base.increment;
+    return Object.assign({}, base, { id, increment });
   }
+
+  const isTimed = (def) => def.measure === 'seconds';
+  const fmtMin = (sec) => Math.round(sec / 60) + '분';
 
   function fmtW(ex, w) {
     if (w == null || w === '') return '무게 미정';
-    if (ex.unit === 'min') return w + '분';
-    return (ex.assisted ? '보조 ' : '') + kgToDisp(w) + unit;
+    return (ex.load === 'assist' ? '보조 ' : '') + kgToDisp(w) + unit;
   }
 
   function history(sessions, id) {
     const out = [];
     for (let i = sessions.length - 1; i >= 0; i--) {
       const s = sessions[i];
-      const ex = (s.exercises || []).find((e) => e.exercise_type === id);
+      const ex = (s.exercises || []).find((e) => e.exercise_id === id);
       if (!ex) continue;
-      if ((ex.sets && ex.sets.some(isNum)) || ex.duration_min != null) out.push({ date: s.date, ex });
+      if (ex.sets && ex.sets.some((x) => isNum(x) || typeof x.duration_sec === 'number')) out.push({ date: s.date, ex, session: s });
     }
     return out;
   }
 
   function hasWeightFor(id, sessions) {
-    return C[id].unit === 'min' || history(sessions, id).length > 0;
+    return isTimed(get(id)) || history(sessions, id).length > 0;
   }
 
   function workSets(ex) {
@@ -65,8 +67,8 @@
   function atWorkingWeight(ex) {
     const ws = workSets(ex);
     if (!ws.length) return { w: null, sets: [] };
-    const w = ws[ws.length - 1].weight;
-    return { w, sets: ws.filter((s) => eq(s.weight, w)) };
+    const w = ws[ws.length - 1].weight_kg;
+    return { w, sets: ws.filter((s) => eq(s.weight_kg, w)) };
   }
 
   function repsText(ex, w, sets) {
@@ -84,13 +86,13 @@
     const last = atWorkingWeight(hist[0].ex);
     if (!last.sets.length) {
       const all = (hist[0].ex.sets || []).filter(isNum);
-      const w = all[all.length - 1].weight;
+      const w = all[all.length - 1].weight_kg;
       return { weight: w, reps: min, reason: '지난 세션 본세트 없음 → 마지막 무게 ' + fmtW(def, w) };
     }
     const w = last.w;
     const sets = last.sets;
     const txt = '지난 세션 ' + repsText(def, w, sets);
-    const inc = def.increment;
+    const inc = def.load === 'assist' ? -def.increment : def.increment;
     const step = (inc > 0 ? '+' : '-') + fmtInc(inc);
 
     if (sets.every((s) => s.reps >= max)) {
@@ -100,12 +102,12 @@
       if (sets.some((s) => s.feel === 'heavy')) {
         return { weight: w, reps: max, reason: txt + ' 상한 달성, 체감 무거움 → 증량 한 세션 미룸', kind: 'wait' };
       }
-      return { weight: round(w + inc), reps: min, reason: txt + ' 전부 상한 달성 → ' + step, kind: 'up' };
+      return { weight: Math.max(0, round(w + inc)), reps: min, reason: txt + ' 전부 상한 달성 → ' + step, kind: 'up' };
     }
     if (failCount(sets, min) >= 2) {
       const prev = hist[1] && atWorkingWeight(hist[1].ex);
       if (prev && prev.w != null && eq(prev.w, w) && failCount(prev.sets, min) >= 2) {
-        return { weight: round(w - inc), reps: min, reason: txt + ', 2회 연속 하한 미달 → ' + (inc > 0 ? '-' : '+') + fmtInc(inc), kind: 'down' };
+        return { weight: Math.max(0, round(w - inc)), reps: min, reason: txt + ', 2회 연속 하한 미달 → ' + (inc > 0 ? '-' : '+') + fmtInc(inc), kind: 'down' };
       }
       return { weight: w, reps: min, reason: txt + ', 하한 미달 세트 2개 이상 → 무게 유지', kind: 'fail' };
     }
@@ -121,7 +123,7 @@
     const last = atWorkingWeight(hist[0].ex);
     if (!last.sets.length) {
       const all = (hist[0].ex.sets || []).filter(isNum);
-      const w0 = all[all.length - 1].weight;
+      const w0 = all[all.length - 1].weight_kg;
       return { weight: w0, reps, reason: '지난 세션 본세트 없음 → 마지막 무게 ' + fmtW(def, w0) };
     }
     const w = last.w;
@@ -140,20 +142,18 @@
     return { weight: w, reps, reason: txt + ', ' + reps + '회 못 채운 세트 있음 → 무게 유지', kind: 'fail' };
   }
 
-  function recommend(id, sessions, prefs) {
-    const def = eff(id, prefs);
+  function recommend(id, sessions, increments) {
+    const def = eff(id, increments);
     const hist = history(sessions, id);
-    const base = { exercise_type: id, sets: def.default_sets || 1, rest_sec: def.rest_sec || 0 };
+    const base = { exercise_id: id, sets: def.default_sets || 1 };
 
-    if (def.unit === 'min') {
-      const d = hist.length && hist[0].ex.duration_min != null ? hist[0].ex.duration_min : def.baseline;
-      return Object.assign(base, { weight: null, reps: null, duration: d, reason: hist.length ? '지난 세션 ' + d + '분' : '기본 ' + d + '분' });
+    if (isTimed(def)) {
+      const last = hist.length ? hist[0].ex.sets.filter((x) => typeof x.duration_sec === 'number').pop() : null;
+      const d = last ? last.duration_sec : def.default_duration_sec;
+      return Object.assign(base, { weight: null, reps: null, duration_sec: d, reason: last ? '지난 세션 ' + fmtMin(d) : '기본 ' + fmtMin(d) });
     }
 
     if (!hist.length) {
-      if (def.start != null) {
-        return Object.assign(base, { weight: def.start, reps: def.rep_range[0], reason: '기록 없음 → 입력한 시작 무게 ' + fmtW(def, def.start) });
-      }
       return Object.assign(base, { weight: null, reps: def.rep_range[0], reason: '기록 없음 → 시작 무게를 입력해 주세요' });
     }
 
@@ -186,7 +186,7 @@
     sessions.forEach((s) => {
       if (s.date <= fromStr || s.date > today) return;
       (s.exercises || []).forEach((e) => {
-        const def = C[e.exercise_type];
+        const def = get(e.exercise_id);
         if (def && def.pattern === pattern) n += workSets(e).length;
       });
     });
@@ -208,7 +208,7 @@
   ];
 
   function pickable(id) {
-    return !!C[id] && !C[id].unsupported;
+    return !!get(id) && !get(id).unsupported;
   }
 
   function candidates(slot) {
@@ -216,20 +216,20 @@
     return [slot.default].concat(slot.alts || []).filter(pickable);
   }
 
-  function buildSession(type, sessions, today, prefs) {
+  function buildSession(type, sessions, today, increments) {
     const tpl = window.TEMPLATES[type];
     return tpl.slots.map((slot, i) => {
       let id;
       let pre = '';
       if (slot.balance) {
-        const counts = slot.balance.map((x) => setsInDays(sessions, C[x].pattern, today, 7));
+        const counts = slot.balance.map((x) => setsInDays(sessions, get(x).pattern, today, 7));
         const k = counts.indexOf(Math.min(...counts));
         id = slot.balance[k];
-        pre = '최근 7일 ' + PATTERN_NAME[C[id].pattern] + ' ' + counts[k] + '세트 · ';
+        pre = '최근 7일 ' + PATTERN_NAME[get(id).pattern] + ' ' + counts[k] + '세트 · ';
       } else {
         id = lastUsed(sessions, candidates(slot)) || slot.default;
       }
-      const r = recommend(id, sessions, prefs);
+      const r = recommend(id, sessions, increments);
       return Object.assign(r, { slot: i, priority: slot.priority, pre });
     });
   }
@@ -263,7 +263,7 @@
   }
 
   window.Engine = {
-    fmtW, setUnit, lbsToKg, kgToDisp, dispToKg, fmtInc, eff, eq, history, hasWeightFor, workSets, recommend, buildSession,
+    fmtW, fmtMin, isTimed, setUnit, lbsToKg, kgToDisp, dispToKg, fmtInc, eff, eq, history, hasWeightFor, workSets, recommend, buildSession,
     candidates, pickable, stage, setSec, localDate, PATTERN_NAME, PATTERN_ORDER, round,
   };
 })();

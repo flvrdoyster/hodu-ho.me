@@ -1,6 +1,6 @@
 # 트레이닝 앱 명세
 
-> 개인용 트레이닝 앱(hodu-home)의 단일 명세. §1–§9는 루틴 추천 규칙 엔진, §10은 어시스턴트 대화, §11은 UX, §12는 구현 순서, §13은 미정 항목.
+> 개인용 트레이닝 앱(hodu-home)의 단일 명세. §1–§9는 루틴 추천 규칙 엔진, §10은 어시스턴트 대화, §11은 UX, §12는 구현 순서, §13은 미정 항목, §14는 데이터 모델.
 > 시각 요소(색·타이포·간격)는 별도 스타일 가이드에서 정의.
 > 상체·하체·풀업처럼 성격이 다른 세션을 하나의 구조로 다루고, 운동과 세션 종류를 계속 추가할 수 있게 하는 것이 목표.
 > 어시스턴트 대화(§10)는 이 문서와 최근 기록을 컨텍스트로 쓴다.
@@ -93,38 +93,33 @@ pattern: horizontal_pull
 #   primary: [middle_back, lats]
 #   secondary: [biceps, rear_delts, traps]
 equipment: cable_machine
-weight_basis: total          # total | per_side (덤벨)
-increment: 2.5               # 기본 증량 폭 (kg)
-rep_range: [8, 10]           # 더블 프로그레션 범위
+load: weight                 # weight | assist | none (§14.6)
+measure: reps                # reps | seconds
+weight_basis: total          # total | per_side (덤벨). load가 none이면 없음
+increment: 2.5               # 기본 증량 폭 (kg, 양수). load가 none이면 없음
+rep_range: [8, 10]           # 더블 프로그레션 범위. measure가 reps일 때
+# default_duration_sec: 900  # measure가 seconds일 때 기본 시간(초)
 default_sets: 3
 rest_sec: 90
 progression: double          # double | linear | none
 difficulty: 1                # 1 쉬움 ~ 3 기술 필요 (대체 추천 시 사용)
-# unit: min                  # 유산소(분)·플랭크(sec)처럼 무게가 아닌 운동만
+# unsupported: true          # 카탈로그에만 두고 선택 목록에서 숨김
 ```
 
-- 카탈로그의 운동에는 **무게도 단위도 없다**. `unit`은 무게가 아닌 운동(유산소 `min`, 플랭크 `sec`)에만 있다. 기준 무게·추정 무게 필드도 없다. 유산소의 기본 시간(`baseline: 15`)만 남아 있다.
-- 헬스장은 한 곳이라 기구 식별(`equipment_id`)과 기구 등록은 없다. 세션 기록의 `equipment_id`는 `null`.
-- **미측정**: 이 운동의 기록이 없는 상태. 기존 운동도 같다. 처음 할 때 시작 무게를 입력받는다 (§4.4). 무게는 오직 기록에서 나온다.
+- 카탈로그의 운동에는 **무게도 단위도 없다.** 기준 무게·추정 무게 필드도 없다. 무게는 오직 기록에서 나온다.
+- 헬스장은 한 곳이라 기구 식별과 기구 등록은 없다. `equipment`는 분류 라벨일 뿐이고 세션 기록에 복사하지 않는다.
+- **미측정**: 이 운동의 기록이 없는 상태. 기존 운동도 같다. 처음 할 때 시작 무게를 입력받는다 (§4.4).
 
 ### 3.1.1 데이터는 kg, 표시는 kg / lbs
 
-- **데이터와 로직은 전부 kg**이다. 세션 기록의 무게, 추천, 증량, 같은 무게 비교, (앞으로 만들) 볼륨·근육 부하 모두 kg 숫자 하나만 다루고 로직에 단위 분기가 없다.
+- **데이터와 로직은 전부 kg**이다. 세션 기록의 무게(`weight_kg`), 추천, 증량, 같은 무게 비교, (앞으로 만들) 볼륨·근육 부하 모두 kg 숫자 하나만 다루고 로직에 단위 분기가 없다.
 - **표시 단위**는 앱 설정 하나(`settings.weight_unit`: `kg` 기본 / `lbs`)다. 운동별로 저장하지 않는다. 운동 카드 무게 칸의 단위 버튼(`kg` / `lbs`)을 누르면 바뀌고, 운동 설정 시트·세트 수정 시트의 무게 칸에도 같은 버튼이 있다. 바꾸면 모든 무게 표기(카드, 세트 줄, 계획·목록·요약, 추천 이유, 오늘 정리, 입력 칸)가 그 단위로 보인다.
-- **lbs 표시**: 저장된 kg을 lbs로 환산해 **5lbs 단위로 반올림**해 보여준다(22.68kg → `50lbs`, 27.7kg → `60lbs`). 추천 무게도 같다. 스테퍼 −/+는 5lbs씩, 증량 폭 표기도 lbs(4.5kg → `10lbs`)다. 입력(시작 무게, 지금 무게, 증량 폭, 세트 수정)도 lbs로 받아 kg으로 환산해 저장한다. 세트를 기록할 때 저장하는 무게는 카드에 보인 값을 kg으로 환산한 값이다(보인 값과 저장값이 어긋나지 않게).
+- **lbs 표시**: 저장된 kg을 lbs로 환산해 **5lbs 단위로 반올림**해 보여준다(22.68kg → `50lbs`, 27.7kg → `60lbs`). 추천 무게도 같다. 스테퍼 −/+는 5lbs씩, 증량 폭 표기도 lbs(4.54kg → `10lbs`)다. 입력(시작 무게, 지금 무게, 증량 폭, 세트 수정)도 lbs로 받아 kg으로 환산해 저장한다. 세트를 기록할 때 저장하는 무게는 카드에 보인 값을 kg으로 환산한 값이다(보인 값과 저장값이 어긋나지 않게).
 - **kg 표시**: 스테퍼는 그 운동의 kg 증량 폭으로 움직이고, 환산에서 온 값은 소수 첫째 자리로 보여준다(22.68 → `22.7kg`).
 - 변환은 화면 경계의 함수 둘뿐이다: `Engine.kgToDisp`(kg→표시), `Engine.dispToKg`(표시→kg). 1lb = 0.45359237kg이고 환산값은 소수 둘째 자리로 저장한다(60lbs → 27.22kg). 입력 칸은 원래 값을 건드리지 않으면 저장값(kg)을 그대로 쓴다. 그래서 단위를 바꿔 보기만 해서는 데이터가 바뀌지 않는다.
 - 같은 무게인가 하는 비교는 kg 허용 오차 0.1kg(`Engine.eq`)으로 한다.
-- **운동별 사용자 설정** `prefs[운동 id]`: 카탈로그와 다른 항목만 저장한다.
-
-| 항목 | 설명 |
-|---|---|
-| `increment` | 증량 폭(kg). 카탈로그 기본값을 덮어쓴다. 보조 운동은 음수. |
-| `start` | 미측정 운동에 입력한 시작 무게(kg). 그 운동의 기록이 생기면 쓰지 않는다. |
-
-- 추천·증량 계산은 덮어쓴 증량 폭(kg)을 쓴다. 내보내기 파일의 `prefs`·`settings`에 들어가고, `prefs`가 없는 예전 파일도 읽는다. 내보내기는 kg만 쓴다 (`unit: 'kg'`, `version: 2`).
-- **예전 lb 기록**: `unit: 'lb'`인 운동(리버스 펙덱, 레그 컬, 레그 익스텐션)은 읽을 때 한 번 kg으로 환산한다(50lb → 22.68kg). 가져오기와 저장소 읽기 모두 같고, 저장소는 `kg_v: 2` 표시로 한 번만 바꾼다. `unit`이 없는 이 세 운동의 예전 기록도 lb로 본다. 진행 중 세션(draft)도 같다.
-- lb였던 세 기계의 기본 증량 폭은 10lb에 가까운 4.5kg이다.
+- **운동별 증량 폭 덮어쓰기** `increments[운동 id]`: 카탈로그 기본값과 다른 운동만 kg 숫자로 저장한다(양수. 보조 운동도 양수). 추천·증량 계산이 이 값을 쓴다.
+- lb 기구(리버스 펙덱, 레그 컬, 레그 익스텐션)의 기본 증량 폭은 10lbs에 해당하는 4.54kg이다.
 
 ### 3.2 현재 등록 운동
 
@@ -133,16 +128,16 @@ difficulty: 1                # 1 쉬움 ~ 3 기술 필요 (대체 추천 시 사
 | id | pattern | increment | rep_range | sets | rest | progression |
 |---|---|---|---|---|---|---|
 | `lat_pulldown` | vertical_pull | 5 | 8–10 | 3 | 90 | double |
-| `assisted_pullup` | vertical_pull | -5 (보조) | 6–8 | 6 | 150 | double |
+| `assisted_pullup` | vertical_pull | 5 (보조) | 6–8 | 6 | 150 | double |
 | `dumbbell_press` | horizontal_push | 2 (per_side) | 8–10 | 3 | 120 | double |
 | `bench_press` | horizontal_push | 2.5 | 8–10 | 3 | 120 | double |
-| `assisted_dip` | horizontal_push | -5 (보조) | 6–8 | 3 | 90 | double |
+| `assisted_dip` | horizontal_push | 5 (보조) | 6–8 | 3 | 90 | double |
 | `cable_pushdown` | elbow_extension | 2.5 | 10–12 | 3 | 75 | double |
 | `seated_cable_row` | horizontal_pull | 2.5 | 8–10 | 3 | 90 | double |
 | `dumbbell_row` | horizontal_pull | 2 (per_side) | 8–10 | 3 | 90 | double |
 | `dumbbell_shoulder_press` | vertical_push | 2 (per_side) | 8–10 | 3 | 90 | double |
 | `dumbbell_curl` | elbow_flexion | 2 (per_side) | 10–12 | 3 | 60 | double |
-| `reverse_pec_deck` | rear_delt | 4.5 | 10–15 | 3 | 60 | double |
+| `reverse_pec_deck` | rear_delt | 4.54 | 10–15 | 3 | 60 | double |
 | `lateral_raise_machine` | lateral_delt | 5 | 12–15 | 3 | 60 | double |
 | `cable_lateral_raise` | lateral_delt | 2.5 | 12–15 | 3 | 60 | double |
 | `deadlift` | hinge | 2.5 | 5 (고정) | 4 | 150 | linear |
@@ -152,14 +147,14 @@ difficulty: 1                # 1 쉬움 ~ 3 기술 필요 (대체 추천 시 사
 | `hack_squat` | squat | 10 | 8–10 | 3 | 120 | double |
 | `split_squat` | lunge | 2 (per_side) | 8–10 | 3 | 90 | double |
 | `walking_lunge` | lunge | 2 (per_side) | 10–12 | 3 | 90 | double |
-| `leg_curl` | knee_flexion | 4.5 | 10–12 | 3 | 75 | double |
-| `leg_extension` | knee_extension | 4.5 | 12–15 | 3 | 75 | double |
+| `leg_curl` | knee_flexion | 4.54 | 10–12 | 3 | 75 | double |
+| `leg_extension` | knee_extension | 4.54 | 12–15 | 3 | 75 | double |
 | `calf_raise` | calf | 5 | 12–15 | 3 | 60 | double |
-| `plank` | core | — | — | 3 | 60 | none |
+| `plank` | core | — | — | 3 | 60 | none (30초, 초 단위) |
 | `cable_crunch` | core | 5 | 12–15 | 3 | 60 | double |
-| `stationary_bike` | cardio | — | — | — | — | none (15분, 분 단위) |
+| `stationary_bike` | cardio | — | — | 1 | 0 | none (900초) |
 
-> `plank`는 무게 없이 세트마다 버틴 시간(초)을 기록하는 운동이다. 지금 앱의 세트 구조(무게 × 횟수, 횟수 카운터)와 달라서 카탈로그에만 `unsupported`로 등록하고 `운동 추가`·`대체` 목록에는 넣지 않는다. 넣으려면 초 입력, 세트 기록의 `seconds` 필드, 시간 기준 추천, 세트 줄·요약 표시가 필요하다.
+> `plank`는 무게 없이 세트마다 버틴 시간(초)을 기록하는 운동이다(`measure: seconds`, 세트는 `{duration_sec}`). 화면은 아직 시간 운동을 세트 1개짜리(유산소)로만 다뤄서 카탈로그에만 `unsupported`로 등록하고 `운동 추가`·`대체` 목록에는 넣지 않는다. 넣으려면 시간 운동의 다세트 입력·세트 줄 표시, 시간 늘리기 규칙(`progression`)이 필요하다.
 
 ---
 
@@ -176,12 +171,12 @@ min, max = rep_range
 reps < min 인 세트가 2개 이상 → 무게 유지 (2회 연속이면 increment만큼 감량)
 ```
 
-- 보조 운동(어시스트 딥, 어시스트 머신)은 increment가 음수 → "증량" = 보조를 줄이는 것.
+- 보조 운동(`load: assist`: 어시스트 딥, 어시스트 머신)은 "증량" = 보조를 `increment`만큼 줄이는 것이다. 무게는 0 아래로 내려가지 않는다.
 - 증량 폭은 kg이고 운동별 설정(§3.1.1)을 쓴다.
 
 ### 4.2 보조 무게 운동 — 풀업·딥
 
-- 어시스트 머신의 보조 무게로 관리하고, 증량은 더블 프로그레션(§4.1)을 따른다 (increment 음수 = 보조 감소).
+- 어시스트 머신의 보조 무게로 관리하고, 증량은 더블 프로그레션(§4.1)을 따른다 (`load: assist` = 보조 감소).
 - **완전 가동범위(턱이 바 위)만 유효 반복(`reps`)으로 센다.**
 - 보조를 줄인 직후 rep_range 하한을 못 채우면 → 네거티브 풀업 3세트를 보조로 추천.
 
@@ -198,7 +193,7 @@ reps < min 인 세트가 2개 이상 → 무게 유지 (2회 연속이면 increm
 별도의 탐색 절차는 없다. 기록이 없는 운동(기존 운동 포함)은 **시작 무게를 한 번 입력받는다** (§11.8).
 
 - 입력한 무게가 첫 세션의 목표 무게다. 그 세션 기록부터는 일반 증량 규칙(§4.1·§4.3)을 따른다.
-- 세션을 끝내지 않고 버려도 입력한 시작 무게는 `prefs`에 남아 다음 세션의 추천 무게가 된다.
+- 시작 무게는 진행 중 세션의 그 운동 항목에만 들어간다. 세션을 끝내지 않고 버리면 남지 않고, 기록이 생겨야 다음 추천이 나온다.
 
 ---
 
@@ -316,24 +311,13 @@ reps < min 인 세트가 2개 이상 → 무게 유지 (2회 연속이면 increm
 
 - 하단에 `되돌리기 / +N` 두 버튼을 나란히 둔다. `되돌리기`는 직전 동작(+1, +N)을 하나씩 취소한다.
 - 제대로 수행했는지는 운동하는 사람이 판단한다. 제대로 하지 못한 반복은 세지 않고, 부분 반복을 따로 기록하지 않는다.
-- 세트 기록의 `input_mode`는 `+N`을 썼으면 `batch`, 아니면 `tap`. 추천 규칙은 이 값과 무관하게 `reps`만 본다.
 
 **세트 체감 입력 (`feel`)**: 세트 기록 직후 `가벼움 / 적당 / 무거움` 버튼을 띄운다 (건너뛰기 가능).
 - 더블 프로그레션(§4.1)에서 상한 횟수를 채웠더라도 `무거움`이면 증량을 한 세션 미룬다.
 
 ### 9.1 입력: 세션 기록
 
-`workout_2026-11-07.json` 구조를 따른다. 추천에 필요한 최소 필드:
-
-```
-date, session_type,
-exercises[].exercise_type, unit("kg"), weight_basis,
-exercises[].sets[].set_number, weight, reps, is_warmup,
-exercises[].sets[].input_mode   // "tap" | "batch"
-exercises[].sets[].feel         // "light" | "ok" | "heavy" | null
-```
-
-- 예시 파일(2026-11-07)은 `input_mode`·`feel` 도입 전 기록이다. 없는 필드는 `null`로 읽는다. `unit: 'lb'`로 들어 있는 운동은 읽을 때 kg으로 환산한다(§3.1.1). `equipment_id`는 쓰지 않는다(`null`).
+세션 기록의 형식은 §14.4가 정한다. 추천에 쓰는 것은 세트의 `weight_kg`, `reps`, `duration_sec`, `is_warmup`, `feel`, `at`뿐이다. 예전 형식의 파일은 가져올 때 §14.8로 변환한다.
 
 ### 9.2 출력: 다음 세션 추천
 
@@ -345,9 +329,9 @@ exercises[].sets[].feel         // "light" | "ok" | "heavy" | null
   "items": [
     {
       "slot": 1,
-      "exercise_type": "lat_pulldown",
-      "weight": 37.5, "unit": "kg",
-      "sets": 3, "reps_target": 8, "rest_sec": 90,
+      "exercise_id": "lat_pulldown",
+      "weight_kg": 37.5,
+      "sets": 3, "reps": 8,
       "reason": "지난 세션 35kg × 10 × 3 전부 상한 달성 → +2.5kg"
     }
   ],
@@ -419,7 +403,7 @@ Claude는 답만 하지 않고 **도구 호출로 앱 상태를 바꾼다.** 예
 §10.1~10.5의 대화형 어시스턴트는 서버가 필요해 미구현. 그 전 단계로 앱 안의 기록만으로 아래를 한다. 여기서 쌓는 메모는 나중에 어시스턴트의 컨텍스트로 쓴다.
 
 - **메모 적기**: 세트 메모는 세트 수정 시트에서, 운동 메모는 휴식 화면일 때 운동 카드 맨 아래 `메모` 줄에서 적는다. 세션 메모는 세션 요약에서. 세트 메모는 세트 줄 아래에 보인다.
-- **지난 메모 보여주기**: 운동 화면의 입력/휴식 영역 아래에 그 운동의 직전 세션 메모와, 그 세션에 적어 둔 다음 목표(`next_targets[운동 id]`)를 보여준다. 계획 화면에는 같은 종류 직전 세션의 세션 메모와 `next_targets.watch`를 보여준다.
+- **지난 메모 보여주기**: 운동 화면의 입력/휴식 영역 아래에 그 운동의 직전 세션 메모와, 그 운동 기록에 적어 둔 다음 목표(`next_note`)를 보여준다. 계획 화면에는 같은 종류 직전 세션의 세션 메모와 `watch_note`를 보여준다.
 - **오늘 정리** (세션 요약 맨 위, 규칙으로 뽑는다)
   - 근력에 쓴 시간과 운동 시간 (마지막 근력 세트 기록 시각 − 시작 시각)
   - 본세트 수: 한 것 / 계획 (시간 때문에 자동으로 뺀 운동 포함)
@@ -482,7 +466,7 @@ Claude는 답만 하지 않고 **도구 호출로 앱 상태를 바꾼다.** 예
 ### 11.5 데이터 저장
 
 - 로컬 저장 + JSON 내보내기/가져오기.
-- 저장 대상: 운동 카탈로그(§3), 세션 템플릿(§7), 확정된 세션 기록(§9.1), 진행 중 세션 `draft`, 사용자 정보(체중), 운동별 설정 `prefs`(증량 폭·시작 무게, §3.1.1), 앱 설정(표시 단위 포함), `coach_notes`(§10.1), 설정.
+- 저장 대상: 운동 카탈로그(§3)와 세션 템플릿(§7)은 코드에 두고, 확정된 세션 기록, 진행 중 세션 `draft`, 운동별 증량 폭 `increments`, 앱 설정(체중·표시 단위 포함)을 localStorage에 둔다 (§14.4). 앞으로 `coach_notes`(§10.1)를 더한다.
 - Google Sheets 연동은 선택. 실패해도 로컬 기록은 유지.
 
 ### 11.6 구현 시 주의할 점
@@ -527,12 +511,165 @@ Claude는 답만 하지 않고 **도구 호출로 앱 상태를 바꾼다.** 예
 
 ## 13. 미정 / 나중에 정할 것
 
-- [ ] 미측정 운동의 기준값 (실측 후 `baseline`으로)
-- [ ] `plank` 지원 (초 단위 세트 기록)
+- [ ] `plank` 지원 (시간 운동의 다세트 입력, 시간 늘리기 규칙)
 - [ ] 디로드 주기 (예: 6~8주마다 볼륨 50%)
 - [ ] 홈 vs 헬스장 장소 구분 (`location` 필드) → 장소별 사용 가능 운동 필터
-- [ ] 스키마 변경 시 세션 기록 JSON 변환
+- [x] 스키마 변경 시 세션 기록 JSON 변환 → §14.8
 - [x] 스타일 가이드 → `STYLE-GUIDE.md`
 - [ ] 애니메이션 스타일 (§11.4)
 - [ ] 어시스턴트 음성 입력 (Web Speech API 등) 여부 (§10.4)
 - [ ] API 키 보관 방식: 기기 저장 vs 서버리스 프록시 (§10.1)
+
+---
+
+## 14. 데이터 모델
+
+앱이 저장하거나 주고받는 모든 데이터의 정식 모양이다. 코드는 이 모양만 읽고 쓴다.
+
+### 14.1 원칙
+
+- 무게 단위는 kg 하나다. 저장 데이터와 로직은 kg 숫자만 다룬다. 파운드는 입력 보조 칸과 보조 표기(§3.1.1)에만 쓰이고 저장되지 않는다.
+- 운동(카탈로그)에는 무게도 단위도 없다. 무게는 기록에서만 나온다.
+- 기구 식별·기구 등록이 없다. 부분 반복을 기록하지 않는다. 세트에는 횟수 하나가 있다.
+- 같은 사실은 한 곳에만 저장한다. 카탈로그에서 알 수 있는 값은 기록에 복사하지 않는다.
+- 배열 순서가 곧 순서다. 운동 순서와 세트 번호를 따로 저장하지 않는다.
+- 계산으로 얻는 값(추천, 예상 시간, 볼륨, 세트 번호)은 저장하지 않는다.
+- 아는 필드만 검사하고 모르는 필드는 지우지 않는다. 변환·가져오기·내보내기가 새 필드를 그대로 통과시킨다.
+
+### 14.2 값 형식
+
+| 종류 | 형식 | 예 |
+|---|---|---|
+| 날짜 | 로컬 `YYYY-MM-DD` 문자열 | `2026-11-14` |
+| 시각 | ISO-8601 UTC(`Z`) | `2026-11-14T00:53:16.206Z` |
+| 시간 길이 | 초 정수, 필드 이름 `*_sec` | `rest_sec: 90`, `duration_sec: 900` |
+| 무게 | kg 숫자, 소수 둘째 자리 | `22.68` |
+| 횟수·세트 수 | 정수 | `10` |
+| 메모 | 문자열. 비면 필드를 두지 않는다 | |
+
+시간 운동의 화면 입력은 분 단위로 하고 저장은 초로 한다.
+
+### 14.3 열거 값
+
+| 필드 | 값 |
+|---|---|
+| `pattern` | `vertical_pull`, `horizontal_pull`, `horizontal_push`, `vertical_push`, `rear_delt`, `lateral_delt`, `elbow_extension`, `elbow_flexion`, `squat`, `hinge`, `lunge`, `knee_extension`, `knee_flexion`, `calf`, `core`, `cardio` |
+| `load` | `weight`, `assist`, `none` |
+| `measure` | `reps`, `seconds` |
+| `weight_basis` | `total`, `per_side` |
+| `progression` | `double`, `linear`, `none` |
+| 슬롯 `priority` | `core`, `main`, `optional` (시간이 부족하면 optional → main 순으로 뺀다) |
+| `session_type` | 템플릿 id (`upper`, `lower`). 모르는 값은 문자열 그대로 보인다 |
+| `feel` | `light`, `ok`, `heavy` (없을 수 있음) |
+| 항목 `status` | `pending`, `done`, `skipped` |
+| draft `phase` | `plan`, `active` |
+| 추천 `kind` | `up`, `down`, `hold`, `wait`, `fail`, `reps` (없을 수 있음) |
+
+### 14.4 저장소와 엔터티
+
+**저장소** localStorage 두 키.
+
+- `workout_v1`: `{version: 3, sessions[], settings, increments}`. 세션과 설정이 바뀔 때만 쓴다.
+- `workout_v1_draft`: 진행 중 세션. 세트를 기록할 때마다 이 키만 다시 쓴다. 불러올 때 `draft.id`가 이미 `sessions`에 있으면 버린다.
+- `workout_v1_pre3`: v3 이전 저장소의 원본 사본. 한 번만 만들고 덮어쓰지 않는다.
+- `workout_v1_bad`: 불러올 때 형식이 맞지 않아 빼 둔 세션의 보관소.
+
+**settings**: `bodyweight_kg`(number\|null), `sound`(bool), `target_sec`(마지막으로 쓴 운동 시간, 새 세션의 기본값), `weight_unit`(`kg`\|`lbs`, 표시용).
+
+**increments**: `{운동 id: kg}`. 카탈로그 기본값과 다른 운동만, 값은 양수.
+
+**SessionRecord** (끝난 세션)
+
+| 필드 | 타입 | 필수 | 뜻 |
+|---|---|---|---|
+| `id` | string | ● | 세션 식별·중복 판정 키 |
+| `date` | 날짜 | ● | 시작한 날 |
+| `session_type` | string | ● | 템플릿 id |
+| `started_at` | 시각 | | 시작 시각 |
+| `duration_sec` | int | | 시작~저장 길이 |
+| `bodyweight_kg` | number | | 그날 체중 |
+| `notes` | string | | 세션 메모 |
+| `watch_note` | string | | 다음에 지켜볼 것 |
+| `exercises` | ExerciseLog[] | ● | 수행 순서. 1개 이상 |
+
+**ExerciseLog**: `exercise_id`(●, 카탈로그 id), `sets`(●, SetLog[], 웜업 포함 수행 순서, 1개 이상), `note`(오늘 메모), `next_note`(다음 목표 메모, 자유 문장).
+
+**SetLog**: `weight_kg`(`load`가 `none`이 아니면 필수. `per_side`면 한 쪽 무게. `assist`면 보조 무게로 0이면 보조 없음), `reps`(`measure`가 `reps`면 필수), `duration_sec`(`measure`가 `seconds`면 필수), `is_warmup`(bool), `feel`, `note`, `at`(기록 시각). 해당 없는 필드는 두지 않는다.
+
+**Draft** (진행 중 세션): `id`(저장하면 세션 `id`가 된다), `date`, `session_type`, `phase`, `current`(지금 항목의 `uid`, plan이면 null), `started_at`(active에서), `target_sec`(이 세션 운동 시간), `bodyweight_kg`, `notes`, `items[]`.
+
+**DraftItem**: `uid`, `exercise_id`, `slot`(템플릿 슬롯 번호, 추가한 운동은 null), `priority`, `status`, `target`, `base_sets`(시간 맞추기 전 세트 수), `pre`(균형 슬롯 설명 머리말), `sets`(SetLog[]), `note`, `auto`(시간 맞추기가 자동으로 뺀 운동), `keep`(직접 복원해서 자동으로 빼지 않는 운동).
+
+- `target`: `{weight_kg, reps, sets}` 또는 시간 운동이면 `{duration_sec, sets}`. `weight_kg`는 지금 무게이고 미측정이면 `null`. 휴식 시간은 카탈로그에서 읽는다.
+
+**ExportFile**: `{version: 3, exported_at, settings, increments, sessions}`. 진행 중 세션은 내보내지 않는다.
+
+### 14.5 저장과 계산
+
+저장하는 것: 세트의 무게·횟수·시간·웜업·체감·메모·시각, 세션 날짜·종류·시작 시각·길이·체중·메모, 증량 폭 덮어쓰기, 설정.
+
+계산하는 것: 추천 무게·횟수·세트·이유, 예상 시간과 세트 시간, 경과·남은 시간, 시간 띠, 볼륨, 본세트 수, 오늘 정리, 세트 번호, 휴식 시간, 목표 대비 단계, lbs 표기. 화면 상태(카운터, 휴식 타이머, 화면 종류)는 저장하지 않는다.
+
+### 14.6 무게 없는 운동
+
+운동의 `load`와 `measure`가 세트에 어떤 필드가 있는지 정한다.
+
+| 종류 | 예 | `load` | `measure` | 세트 | `progression` |
+|---|---|---|---|---|---|
+| 무게 | 랫풀다운, 덤벨 프레스 | `weight` | `reps` | `{weight_kg, reps}` | `double`, `linear` |
+| 보조 | 어시스트 풀업·딥 | `assist` | `reps` | `{weight_kg(보조), reps}` | `double` (보조를 줄이는 쪽이 증량) |
+| 맨몸 횟수 | 푸시업 | `none` | `reps` | `{reps}` | `none` |
+| 시간 | 플랭크 | `none` | `seconds` | `{duration_sec}` | `none` |
+| 유산소 | 실내 사이클 | `none` | `seconds` | `{duration_sec}` 1개 | `none` |
+
+`load`·`measure`·`weight_basis`는 운동을 만든 뒤 바꾸지 않는다(옛 기록의 뜻이 변하므로). 바꿔야 하면 새 운동으로 만든다.
+
+### 14.7 데이터 버전
+
+| 버전 | 모양 |
+|---|---|
+| 1 (버전 없음, `version: 1`) | 운동별 `unit`, lb 무게가 섞여 있음, `exercise_type`, `weight`, 분 단위 |
+| 2 (`kg_v: 2` 저장소, `version: 2` 내보내기) | 무게는 kg, 필드 이름은 v1과 같음 |
+| 3 | 이 문서의 모양 |
+
+- 선택 필드를 더하는 것은 버전을 올리지 않는다. 이름·의미·삭제·필수화가 바뀌면 올린다.
+- 파일의 `version`이 앱보다 크면 가져오기를 거부한다. 버전이 없는 세션 배열·단일 세션 파일은 v1로 보되, 필드가 이미 v3 모양이면 그대로 읽는다.
+
+### 14.8 변환 (v1·v2 → v3)
+
+읽을 때 한 번 변환하고, 이미 v3인 데이터에 다시 적용해도 바뀌지 않는다. 변환 전 저장소 원본은 `workout_v1_pre3`에 둔다.
+
+| 이전 | v3 |
+|---|---|
+| 세션 `id` 없음 | `legacy:<date>:<session_type>` (같은 날 같은 종류가 더 있으면 `:2`, `:3`) |
+| 세션 `duration_min` | `duration_sec` = × 60 |
+| 세션 `next_targets.watch`, `add_next_time` | `watch_note` (`add_next_time`은 `다음에 추가: …`로 이어 붙임) |
+| 세션 `next_targets[운동 id]` | 그 ExerciseLog의 `next_note` |
+| 빈 `notes`, `null` 체중 | 필드 삭제 |
+| 운동 `exercise_type` | `exercise_id` |
+| 운동 `order`, `equipment`, `equipment_id`, `unit`, `weight_basis`, `weight_kg_approx` | 삭제 |
+| 유산소 운동 `duration_min` (세트 없음) | `sets: [{duration_sec: 분 × 60}]` |
+| 세트 `weight` | `weight_kg`. 운동 `unit`이 `lb`면 `× 0.45359237`을 소수 둘째 자리로(50lb → 22.68). `unit`이 없는 리버스 펙덱·레그 컬·레그 익스텐션의 숫자 무게도 lb로 본다 |
+| 세트 `set_number`, `input_mode` | 삭제 |
+| 세트 `feel: null`, 빈 `note` | 필드 삭제 |
+| `settings.target_min` | `settings.target_sec` = × 60 |
+| `prefs[id].increment` | `increments[id]` = 절댓값(lb 기구는 lb 값을 kg으로 환산). 카탈로그 기본값과 같으면 두지 않는다 |
+| `prefs[id].unit`, `prefs[id].start` | 삭제 |
+| draft `target_min` | `target_sec` = × 60 |
+| draft 항목 `exercise_type`, `cur_weight`, `target.weight` | `exercise_id`, `target.weight_kg` (lb 기구는 환산) |
+| draft 항목 `duration_min`, `target.duration`, `target.rest_sec`, `reason` | `target.duration_sec`(× 60), 나머지 삭제 |
+| draft 세트 | 세트 변환과 같음. 유산소 `{duration_min}` → `{duration_sec}` |
+
+### 14.9 가져오기 검사
+
+받는 모양: 내보내기 파일, 세션 배열, 단일 세션. 가져온 뒤 세션마다 검사한다.
+
+- 필수: `date`가 실존하는 날짜, `session_type`, `id`(변환이 채운다), `exercises`가 배열.
+- 운동은 `exercise_id`와 `sets` 배열이 있어야 한다. 유효한 세트가 하나도 없는 운동은 뺀다. 유효한 운동이 없는 세션은 건너뛴다.
+- 세트: `weight_kg`는 0 이상 1000 이하, `reps`는 1~200 정수, `duration_sec`은 1~14400 정수. 숫자 문자열은 숫자로 바꾼다. 카탈로그의 `load`·`measure`가 요구하는 필드가 없으면 그 세트를 뺀다. `feel`이 열거값이 아니면, `at`이 읽을 수 없거나 하루 넘게 미래면 그 필드만 뺀다.
+- 카탈로그에 없는 `exercise_id`는 기록을 보관하고 추천·균형 계산에서 쓰지 않는다. 확인창에 알린다.
+- 체중은 20~300kg 밖이면 그 필드만 뺀다. 증량 폭은 카탈로그에 있고 `load`가 `none`이 아닌 운동의 양수(100 이하)만 받는다.
+- 중복: `id`가 같으면 교체한다(확인창에 개수). 같은 날 같은 종류라도 `id`가 다르면 둘 다 둔다.
+- 내보내기 파일의 `settings`(`sound`, `target_sec`, `weight_unit`, 유효한 `bodyweight_kg`)와 `increments`도 적용하고, 확인창에 알린다.
+- 불러올 때(저장소)는 같은 검사를 하되 범위 밖 값은 지우지 않고, 형식이 맞지 않는 세션만 `workout_v1_bad`로 옮긴다.
+- 세션은 `date`, `started_at`, `id` 순으로 정렬해 둔다. 마지막 원소가 가장 최근이다.
