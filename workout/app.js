@@ -383,10 +383,13 @@
   document.addEventListener('pointerup', dragEnd);
   document.addEventListener('pointercancel', dragEnd);
 
+  const ICONS = { back: '<path d="M12 2 L4 10 L12 18"/>' };
+  const icon = (name) => '<svg class="icon" viewBox="3 0 20 20" aria-hidden="true" focusable="false">' + ICONS[name] + '</svg>';
+  const iconBtn = (act, name, label) => '<button type="button" class="btn btn--ghost btn--sm btn--icon-only" data-act="' + act + '" aria-label="' + label + '">' + icon(name) + '</button>';
   const textBtn = (act, label) => '<button type="button" class="btn btn--ghost btn--sm" data-act="' + act + '">' + label + '</button>';
 
   function topbar(o) {
-    return '<header class="topbar">' + (o.left ? '<div class="topbar__l">' + o.left + '</div>' : '') +
+    return '<header class="topbar' + (o.band ? ' topbar--fill' : '') + '">' + (o.left ? '<div class="topbar__l">' + o.left + '</div>' : '') +
       '<div class="topbar__c">' + (o.band ? bandHTML() : '<h1>' + esc(o.title) + '</h1>') + '</div>' +
       (o.right ? '<div class="topbar__r">' + o.right + '</div>' : '') + '</header>';
   }
@@ -446,7 +449,7 @@
 
   function listHTML() {
     const editing = ui.editing;
-    return topbar({ title: '세션 목록', left: textBtn('back-ex', '‹ 운동으로'), right: textBtn('list-edit', editing ? '완료' : '편집') }) +
+    return topbar({ title: '목록', left: iconBtn('back-ex', 'back', '운동으로'), right: textBtn('list-edit', editing ? '완료' : '편집') }) +
       '<section class="stack">' + timeCardHTML() + rowsHTML(editing ? 'edit' : 'list') +
       '<button type="button" class="btn" data-act="add">운동 추가</button>' +
       hx('<button type="button" class="btn" data-act="finish">세션 종료</button>') +

@@ -18,6 +18,8 @@
   --fs-timer: 64px;
   --fs-value: 22px;
   --fs-icon: 20px;
+  --icon-size: var(--fs-icon);
+  --icon-stroke: 2px;
   --fs-title: 18px;
   --fs-body: 16px;
   --fs-sub: 14px;
@@ -120,19 +122,21 @@ strong { font-weight: var(--fw-bold); }
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(var(--h-touch), 1fr) minmax(0, auto) minmax(var(--h-touch), 1fr);
+  column-gap: var(--sp-sm);
   align-items: center;
-  gap: var(--sp-sm);
   min-height: calc(var(--topbar-h) + env(safe-area-inset-top));
   margin: 0 calc(var(--sp-lg) * -1);
   padding: env(safe-area-inset-top) var(--sp-lg) 0;
   background: var(--bg);
 }
-.topbar__l, .topbar__r { flex: none; }
-.topbar__l { margin-left: calc(var(--sp-sm) * -1); }
-.topbar__r { margin-left: auto; margin-right: calc(var(--sp-sm) * -1); }
-.topbar__c { flex: 1; min-width: 0; display: flex; align-items: center; }
-.topbar__c h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar__l { grid-column: 1; justify-self: start; margin-left: calc(var(--sp-sm) * -1); }
+.topbar__c { grid-column: 2; min-width: 0; display: flex; align-items: center; justify-content: center; }
+.topbar__r { grid-column: 3; justify-self: end; margin-right: calc(var(--sp-sm) * -1); }
+.topbar__c h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar--fill { grid-template-columns: auto 1fr auto; column-gap: 0; }
+.topbar--fill .topbar__c { margin-right: var(--sp-sm); }
 .topbar__c .band { height: var(--band-h-slim); }
 
 .stack { display: flex; flex-direction: column; gap: var(--sp-md); padding-top: var(--sp-xs); }
@@ -194,6 +198,9 @@ strong { font-weight: var(--fw-bold); }
 }
 
 .btn--sm, .set, .memo-row, .check, .prev-wrap summary { position: relative; }
+.icon { display: block; width: var(--icon-size); height: var(--icon-size); fill: none; stroke: currentColor; stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; }
+.btn--icon-only { display: inline-flex; align-items: center; justify-content: center; padding: 0; margin-left: calc((var(--icon-size) - var(--h-touch)) / 2 + var(--sp-sm)); }
+
 .btn--sm::after, .set::after, .memo-row::after, .check::after, .prev-wrap summary::after {
   content: "";
   position: absolute;
