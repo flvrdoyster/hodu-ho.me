@@ -9,7 +9,6 @@
   const app = document.getElementById('app');
   const sheet = document.getElementById('sheet');
   const toastEl = document.getElementById('toast');
-  const importFile = document.getElementById('importFile');
 
   const FEEL = { light: '가벼움', ok: '적당', heavy: '무거움' };
   const STATUS = { pending: '대기', done: '완료', skipped: '생략' };
@@ -790,6 +789,9 @@
       html = sheetHead(def(cur()).name + ' 설정') + exSetHTML(cur());
     } else if (k === 'settings') {
       html = sheetHead('설정') + settingsHTML();
+    } else if (k === 'export') {
+      html = sheetHead('기록 복사') + '<div class="stack-sm"><p class="muted small">자동으로 복사하지 못했어요. 아래 내용을 모두 선택해서 복사해 주세요.</p>' +
+        '<textarea class="input" id="exportText" rows="10" readonly>' + esc(ui.exportText || '') + '</textarea></div>';
     }
     sheet.innerHTML = '<div class="sheet__body">' + html + '</div>';
     sheet.querySelectorAll('input,select,textarea').forEach((el) => {
@@ -883,8 +885,7 @@
       '<label class="check"><input type="checkbox" id="sHaptic"' + (st.haptic ? ' checked' : '') + '> 햅틱</label>' +
       '<button type="button" class="btn btn--primary" data-act="settings-save">설정 저장</button>' +
       '<hr><p class="muted small">저장된 세션 ' + S.sessions.length + '개' + (last ? ' · 최근 ' + esc(last.date) : '') + '</p>' +
-      '<button type="button" class="btn" data-act="export">기록 내보내기 (JSON)</button>' +
-      '<button type="button" class="btn" data-act="import">기록 가져오기 (JSON)</button>' +
+      '<button type="button" class="btn" data-act="export">기록 복사 (JSON)</button>' +
       '<button type="button" class="btn btn--danger" data-act="wipe">모든 데이터 지우기</button></div>';
   }
 
@@ -1192,19 +1193,20 @@
     },
     export() {
       const data = { version: Dt.VERSION, exported_at: new Date().toISOString(), settings: S.settings, increments: S.increments, sessions: S.sessions };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'workout_export_' + today() + '.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      const text = JSON.stringify(data, null, 2);
+      const fallback = () => {
+        ui.exportText = text;
+        openSheet('export');
+        const ta = document.getElementById('exportText');
+        if (ta) { ta.focus(); ta.select(); }
+      };
+      try {
+        navigator.clipboard.writeText(text).then(() => toast('기록을 클립보드에 복사했어요'), fallback);
+      } catch (e) { fallback(); }
     },
-    import() { importFile.click(); },
     wipe() {
       if (!confirm('세션 기록·진행 중 세션·설정을 모두 지울까요? 되돌릴 수 없어요.')) return;
-      if (!confirm('정말 지울까요? 먼저 내보내기를 해 두는 것을 권해요.')) return;
+      if (!confirm('정말 지울까요? 먼저 기록 복사를 해 두는 것을 권해요.')) return;
       S = Dt.emptyStore();
       E.setUnit('kg');
       save(true);
@@ -1212,38 +1214,6 @@
     },
   };
 
-
-  importFile.addEventListener('change', () => {
-    const f = importFile.files[0];
-    importFile.value = '';
-    if (!f) return;
-    f.text().then((txt) => {
-      let data;
-      try { data = JSON.parse(txt); } catch (e) { return toast('JSON을 읽지 못했어요'); }
-      const r = Dt.parseImport(data, window.Catalog);
-      if (r.error) return toast(r.error);
-      const nInc = Object.keys(r.increments).length;
-      const nSet = r.settings ? Object.keys(r.settings).length : 0;
-      if (!r.sessions.length && !nInc && !nSet) return toast('가져올 세션이 없어요');
-      const merged = Dt.mergeSessions(S.sessions, r.sessions);
-      let msg = '세션 ' + r.sessions.length + '개' + (nInc ? '와 운동 설정 ' + nInc + '개' : '') + (nSet ? '와 앱 설정' : '') + '를 가져올까요?';
-      if (merged.replaced) msg += ' 같은 세션 ' + merged.replaced + '개는 덮어씁니다.';
-      if (r.skipped.length) msg += ' 형식이 맞지 않아 건너뛰는 세션 ' + r.skipped.length + '개.';
-      if (r.unknown.length) msg += ' 카탈로그에 없는 운동 ' + r.unknown.length + '개(' + r.unknown.join(', ') + ')는 기록만 보관합니다.';
-      if (nSet) msg += ' 앱 설정도 덮어씁니다.';
-      if (!confirm(msg)) return;
-      Object.assign(S.increments, r.increments);
-      S.sessions = merged.sessions;
-      if (r.settings) {
-        Object.assign(S.settings, r.settings);
-        E.setUnit(S.settings.weight_unit);
-      }
-      save(true);
-      closeSheet();
-      render();
-      toast('세션 ' + r.sessions.length + '개를 가져왔어요');
-    });
-  });
 
   function dispatch(e) {
     let el = e.target.closest('[data-act]');

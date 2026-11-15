@@ -322,14 +322,6 @@
     return { good, bad, unknown };
   }
 
-  function mergeSessions(existing, incoming) {
-    const ids = new Set(incoming.map((s) => s.id));
-    const have = new Set(existing.map((s) => s.id));
-    const replaced = incoming.filter((s) => have.has(s.id)).length;
-    const sessions = existing.filter((s) => !ids.has(s.id)).concat(incoming).sort(sessionOrder);
-    return { sessions, replaced };
-  }
-
   function firstAt(s) {
     let t = '';
     (s.exercises || []).forEach((e) => (e.sets || []).forEach((x) => { if (x.at && (!t || x.at < t)) t = x.at; }));
@@ -384,7 +376,7 @@
   const Data = {
     VERSION, LEGACY_LB, newId, round2, lbToKg, defaultSettings, emptyStore, sessionOrder,
     migrateSession, migrateSessions, migrateDraft, migrateStore, migratePrefs, cleanIncrements, cleanSettings,
-    checkSession, checkList, mergeSessions, sameSession, addMissing, parseImport,
+    checkSession, checkList, sameSession, addMissing, parseImport,
   };
   root.Data = Data;
   if (typeof module !== 'undefined' && module.exports) module.exports = Data;
