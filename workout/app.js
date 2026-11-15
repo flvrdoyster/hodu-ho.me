@@ -130,8 +130,41 @@
 
   const strength = (it) => it.status !== 'skipped' && !isTimed(it);
 
+  const IDLE_CAP_MS = 600000;
+  const IDLE_END_MS = 1800000;
+
+  function startMs() {
+    const t = D().started_at ? new Date(D().started_at).getTime() : NaN;
+    return isFinite(t) ? t : null;
+  }
+
+  function lastRecordMs() {
+    let strengthEnd = null;
+    let end = null;
+    items().forEach((it) => {
+      if (isTimed(it)) return;
+      it.sets.forEach((x) => {
+        const t = x.at ? new Date(x.at).getTime() : NaN;
+        if (isFinite(t) && (strengthEnd == null || t > strengthEnd)) strengthEnd = t;
+      });
+    });
+    items().forEach((it) => {
+      if (!isTimed(it) || !it.sets.length) return;
+      const x = it.sets[0];
+      const t = x.at ? new Date(x.at).getTime() : NaN;
+      const e = isFinite(t) ? t : (strengthEnd != null && x.duration_sec ? strengthEnd + x.duration_sec * 1000 : null);
+      if (e != null && (end == null || e > end)) end = e;
+    });
+    if (strengthEnd != null && (end == null || strengthEnd > end)) end = strengthEnd;
+    return end;
+  }
+
   function elapsedSec() {
-    return D().started_at ? Math.max(0, (Date.now() - new Date(D().started_at).getTime()) / 1000) : 0;
+    const st = startMs();
+    if (st == null) return 0;
+    const last = lastRecordMs();
+    const cap = Math.max(st, last == null ? st : last) + IDLE_CAP_MS;
+    return Math.max(0, (Math.min(Date.now(), cap) - st) / 1000);
   }
 
   function leftSec(it) {
@@ -260,6 +293,7 @@
   const mmss = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 
   setInterval(() => {
+    if (endIfIdle()) { render(); return; }
     const tick = document.getElementById('bandTick');
     if (tick && S.draft) {
       tick.style.left = Math.min(100, elapsedSec() / Number(tick.dataset.scale) * 100) + '%';
@@ -293,7 +327,11 @@
       l.addEventListener('release', () => { wakeLock = null; });
     }).catch(() => {});
   }
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (endIfIdle()) render();
+    keepAwake();
+  });
 
   function render() {
     if (!S.draft) app.innerHTML = homeHTML();
@@ -611,15 +649,51 @@
       if (it.note) ex.note = it.note;
       exercises.push(ex);
     });
-    const started = dr.started_at ? new Date(dr.started_at) : new Date();
     const bw = dr.bodyweight_kg != null ? dr.bodyweight_kg : S.settings.bodyweight_kg;
     const log = { id: dr.id, date: dr.date, session_type: dr.session_type };
     if (dr.started_at) log.started_at = dr.started_at;
-    log.duration_sec = Math.max(60, Math.round((Date.now() - started.getTime()) / 1000));
+    const st = startMs();
+    const last = lastRecordMs();
+    log.duration_sec = st != null && last != null ? Math.max(60, Math.round((last - st) / 1000)) : 60;
     if (bw != null) log.bodyweight_kg = bw;
     if (dr.notes) log.notes = dr.notes;
     log.exercises = exercises;
     return log;
+  }
+
+  function commitSession() {
+    const log = buildLog();
+    if (log.bodyweight_kg != null) S.settings.bodyweight_kg = log.bodyweight_kg;
+    S.sessions.push(log);
+    S.sessions.sort(Dt.sessionOrder);
+    S.draft = null;
+    ui.screen = 'main';
+    ui.timer.running = false;
+    if (wakeLock) wakeLock.release();
+    save(true);
+  }
+
+  function endIfIdle() {
+    if (!S.draft || D().phase !== 'active') return false;
+    const st = startMs();
+    const last = lastRecordMs();
+    const base = last != null ? last : st;
+    if (base == null || Date.now() - base < IDLE_END_MS) return false;
+    closeSheet();
+    if (last == null) {
+      S.draft = null;
+      ui.screen = 'main';
+      ui.timer.running = false;
+      if (wakeLock) wakeLock.release();
+      save();
+      toast('기록이 없어 진행 중이던 세션을 지웠어요');
+    } else {
+      const it = cur();
+      if (it && it.sets.length && !isTimed(it)) it.status = 'done';
+      commitSession();
+      toast(Math.round(IDLE_END_MS / 60000) + '분 동안 기록이 없어 세션을 자동으로 저장했어요');
+    }
+    return true;
   }
 
   function digestHTML(future) {
@@ -1056,7 +1130,7 @@
     },
     'cardio-done'() {
       const it = cur();
-      it.sets = [{ duration_sec: it.target.duration_sec }];
+      it.sets = [{ duration_sec: it.target.duration_sec, at: new Date().toISOString() }];
       it.status = 'done';
       save();
       toast(def(it).name + ' ' + E.fmtMin(it.target.duration_sec) + ' 기록');
@@ -1103,15 +1177,7 @@
       D().bodyweight_kg = bw === '' ? null : Number(bw);
       D().notes = document.getElementById('notes').value;
       if (!confirm('이 세션을 기록으로 저장할까요?')) return;
-      const log = buildLog();
-      if (log.bodyweight_kg != null) S.settings.bodyweight_kg = log.bodyweight_kg;
-      S.sessions.push(log);
-      S.sessions.sort(Dt.sessionOrder);
-      S.draft = null;
-      ui.screen = 'main';
-      ui.timer.running = false;
-      if (wakeLock) wakeLock.release();
-      save(true);
+      commitSession();
       toast('저장했어요');
     },
     settings() { openSheet('settings'); },
@@ -1200,6 +1266,7 @@
   document.addEventListener('click', dispatch);
   document.addEventListener('change', dispatch);
 
+  endIfIdle();
   if (S.draft && S.draft.phase === 'active') {
     const it = cur();
     if (!it) S.draft.current = (S.draft.items.find((x) => x.status === 'pending') || S.draft.items[0]).uid;
