@@ -15,9 +15,8 @@
 
   let S = load();
   E.setUnit(S.settings.weight_unit);
-  const undoStack = [];
   const ui = {
-    screen: 'main', phase: 'input', feelIdx: null, msg: '',
+    screen: 'main', phase: 'input', msg: '',
     reps: 0, editing: false, sheetKind: null, sheetArg: null,
     timer: { running: false, endsAt: 0, remaining: 0, total: 0 },
   };
@@ -121,12 +120,6 @@
     return E.fmtW(d, s.weight_kg) + ' × ' + s.reps + '회';
   }
 
-  function weightSub(d, w) {
-    const parts = [];
-    if (d.weight_basis === 'per_side') parts.push('한 쪽');
-    return parts.join(' · ');
-  }
-
   const strength = (it) => it.status !== 'skipped' && !isTimed(it);
 
   const IDLE_CAP_MS = 600000;
@@ -216,33 +209,28 @@
 
   const timeUp = () => D().phase === 'active' && elapsedSec() >= targetSec();
 
-  function bandHTML() {
+  function sbarHTML(edit) {
     const list = items().filter(strength);
     const planned = list.reduce((a, it) => a + Math.max(planSec(it), workDone(it) * setSec(it)), 0);
     const scale = Math.max(targetSec(), planned, 1);
+    const run = D().phase === 'active';
     const segs = list.map((it) => {
       const sec = Math.max(planSec(it), workDone(it) * setSec(it));
       const fill = Math.min(1, workDone(it) / Math.max(1, it.target.sets));
-      return '<span class="band__seg' + (D().phase === 'active' && it.uid === D().current ? ' is-current' : '') + '" style="flex:' + sec + ' 0 0"><span class="band__fill" style="width:' + (fill * 100) + '%"></span></span>';
+      return '<span class="sbar__s" style="flex:' + sec + ' 0 0"><i style="width:' + (fill * 100) + '%"></i></span>';
     }).join('');
     const free = scale - planned;
-    const tick = D().phase === 'active' ? '<span class="band__tick' + (timeUp() ? ' is-over' : '') + '" id="bandTick" data-scale="' + scale + '" style="left:' + Math.min(100, elapsedSec() / scale * 100) + '%"></span>' : '';
-    return '<div class="band" role="img" aria-label="시간 배분">' + segs + (free > 0 ? '<span class="band__free" style="flex:' + free + ' 0 0"></span>' : '') + tick + '</div>';
+    const tick = run ? '<span class="sbar__n" id="bandTick" data-scale="' + scale + '" style="left:' + Math.min(100, elapsedSec() / scale * 100) + '%"></span>' : '';
+    const text = (run ? Math.floor(elapsedSec() / 60) : Math.round(list.reduce((a, it) => a + planSec(it), 0) / 60)) + ' / ' + targetMin() + '분';
+    const over = timeUp() ? ' is-over' : '';
+    const label = edit
+      ? '<button type="button" class="sbar__l' + over + '" id="sbarL" data-act="time-edit" aria-label="운동 시간 바꾸기">' + text + '</button>'
+      : '<span class="sbar__l' + over + '" id="sbarL">' + text + '</span>';
+    return '<div class="sbar"><div class="sbar__t" role="img" aria-label="시간 배분">' + segs + (free > 0 ? '<span class="sbar__f" style="flex:' + free + ' 0 0"></span>' : '') + tick + '</div>' + label + '</div>';
   }
-
-  function timeCardHTML() {
-    const planned = Math.round(items().filter(strength).reduce((a, it) => a + planSec(it), 0) / 60);
-    const cut = items().filter((it) => it.auto && it.status === 'skipped').length;
-    const run = D().phase === 'active';
-    return '<div class="card timecard">' + stepper('운동 시간', 'time', targetMin() + '분') + bandHTML() +
-      '<p class="muted small">' + (run ? '경과 ' + Math.floor(elapsedSec() / 60) + '분 · ' : '') + '근력 예상 ' + planned + '분' + (cut ? ' · 시간에 맞춰 뺀 운동 ' + cut + '개' : '') + '</p></div>';
-  }
-
-  function remember() { undoStack.push({ reps: ui.reps }); }
 
   function resetCounters(it) {
-    ui.reps = 0;
-    undoStack.length = 0;
+    ui.reps = it && !isTimed(it) ? (it.target.reps || 0) : 0;
   }
 
   let actx = null;
@@ -296,22 +284,25 @@
     const tick = document.getElementById('bandTick');
     if (tick && S.draft) {
       tick.style.left = Math.min(100, elapsedSec() / Number(tick.dataset.scale) * 100) + '%';
-      tick.classList.toggle('is-over', timeUp());
+      const lab = document.getElementById('sbarL');
+      if (lab) {
+        lab.textContent = Math.floor(elapsedSec() / 60) + ' / ' + targetMin() + '분';
+        lab.classList.toggle('is-over', timeUp());
+      }
     }
     const t = ui.timer;
     if (!t.running) return;
     const left = timerLeft();
     const el = document.getElementById('timerText');
     if (el) el.textContent = mmss(left);
-    const bar = document.getElementById('timerBar');
-    if (bar) bar.style.transform = 'scaleX(' + (t.total ? left / t.total : 0) + ')';
+    const fill = document.getElementById('restFill');
+    if (fill) fill.style.height = (t.total ? Math.min(100, left / t.total * 100) : 0) + '%';
     if (left <= 0) {
       t.running = false;
       t.remaining = 0;
       beep();
       if (S.draft && D().phase === 'active' && ui.screen === 'main' && ui.phase === 'rest') {
         ui.phase = 'input';
-        ui.feelIdx = null;
         render();
       }
       toast('휴식 끝');
@@ -366,7 +357,7 @@
       if (i < g.from && center < mid) to = Math.min(to, i);
     });
     g.to = to;
-    const size = g.rects[g.from].h + 8;
+    const size = g.rects[g.from].h;
     g.rows.forEach((el, i) => {
       if (i === g.from) return;
       let off = 0;
@@ -421,56 +412,83 @@
   document.addEventListener('pointerup', dragEnd);
   document.addEventListener('pointercancel', dragEnd);
 
-  const ICONS = { back: '<path d="M12 2 L4 10 L12 18"/>' };
+  const ICONS = { back: '<path d="M12 2 L4 10 L12 18"/>', down: '<path d="M7 7 L13 13 L19 7"/>' };
   const icon = (name) => '<svg class="icon" viewBox="3 0 20 20" aria-hidden="true" focusable="false">' + ICONS[name] + '</svg>';
-  const iconBtn = (act, name, label) => '<button type="button" class="btn btn--ghost btn--sm btn--icon-only" data-act="' + act + '" aria-label="' + label + '">' + icon(name) + '</button>';
-  const textBtn = (act, label) => '<button type="button" class="btn btn--ghost btn--sm" data-act="' + act + '">' + label + '</button>';
+  const iconBtn = (act, name, label) => '<button type="button" class="hd__b" data-act="' + act + '" aria-label="' + label + '">' + icon(name) + '</button>';
+  const textBtn = (act, label) => '<button type="button" class="hd__a" data-act="' + act + '">' + label + '</button>';
+  const tag = (text) => '<span class="tag">' + text + '</span>';
 
   function topbar(o) {
-    return '<header class="topbar' + (o.band ? ' topbar--fill' : '') + '">' + (o.left ? '<div class="topbar__l">' + o.left + '</div>' : '') +
-      '<div class="topbar__c">' + (o.band ? bandHTML() : '<h1>' + esc(o.title) + '</h1>') + '</div>' +
-      (o.right ? '<div class="topbar__r">' + o.right + '</div>' : '') + '</header>';
+    return '<header class="hd">' + (o.left || '') +
+      (o.sub ? '<span class="lbl hd__s">' + esc(o.sub) + '</span>' : '<h1 class="hd__t">' + esc(o.title) + '</h1>') +
+      (o.right || '') + '</header>';
   }
 
   function homeHTML() {
     const last = S.sessions[S.sessions.length - 1];
-    let lastHTML = '<p class="muted">아직 기록이 없어요. 설정에서 이전 기록을 가져올 수 있어요.</p>';
+    let stage = '<p class="lbl">아직 기록이 없어요.</p>';
     if (last) {
       const names = (last.exercises || []).map((e) => (get(e.exercise_id) ? get(e.exercise_id).name : e.exercise_id)).join(', ');
-      lastHTML = '<p class="label">지난 세션</p><p><strong>' + esc(last.date) + '</strong> · ' + esc(tplName(last.session_type)) + (last.duration_sec ? ' · ' + Math.round(last.duration_sec / 60) + '분' : '') + '</p><p class="muted small">' + esc(names) + '</p>';
+      stage = '<span class="lbl">지난 세션 · ' + esc(last.date) + '</span>' +
+        '<div class="last__v">' + esc(tplName(last.session_type)) + (last.duration_sec ? '<u>' + Math.round(last.duration_sec / 60) + '분</u>' : '') + '</div>' +
+        '<p class="last__s">' + esc(names) + '</p>';
     }
-    const btns = Object.keys(window.TEMPLATES).map((k) => '<button type="button" class="btn btn--primary btn--lg" data-act="new-session" data-type="' + k + '">' + esc(window.TEMPLATES[k].name) + ' 세션 만들기</button>').join('');
-    return topbar({ title: '운동 기록', right: textBtn('settings', '설정') }) + '<section class="stack stack--lead"><p class="lead">' + esc(today()) + '</p>' + btns + '<div class="card">' + lastHTML + '</div></section>';
+    const btns = Object.keys(window.TEMPLATES).map((k) => '<button type="button" class="cta" data-act="new-session" data-type="' + k + '"><b>' + esc(window.TEMPLATES[k].name) + '</b><small>세션 만들기</small></button>').join('');
+    return '<div class="screen">' + topbar({ title: '운동 기록', right: textBtn('settings', '설정') }) +
+      '<div class="top"><span class="lbl">오늘 ' + esc(today()) + '</span></div>' +
+      '<div class="stage">' + stage + '</div><div class="dock"><div class="pick">' + btns + '</div></div></div>';
   }
 
   function tplName(t) {
     return window.TEMPLATES[t] ? window.TEMPLATES[t].name : t;
   }
 
+  function fullReason(it) {
+    if (unmeasured(it)) return '';
+    return (it.pre || '') + E.recommend(it.exercise_id, S.sessions, S.increments).reason;
+  }
+
+  function shortReason(it) {
+    const r = fullReason(it);
+    const i = r.lastIndexOf('→');
+    return (i < 0 ? r : r.slice(i + 1)).trim();
+  }
+
+  function rowHTML(it, mode) {
+    const d = def(it);
+    const live = D().phase === 'active';
+    const isCur = live && it.uid === D().current;
+    const off = it.status === 'skipped';
+    const tags = (unmeasured(it) ? tag('미측정') : '') + (it.priority === 'optional' ? tag('선택') : '');
+    let sub;
+    if (live && it.sets.length) sub = doneText(it) + (!isTimed(it) && workDone(it) < it.target.sets ? ' · 목표 ' + it.target.sets + '세트' : '');
+    else {
+      sub = targetText(it);
+      const why = live || off ? '' : shortReason(it);
+      if (why) sub += ' · ' + why;
+    }
+    let right = '';
+    if (mode !== 'edit') {
+      if (live) right = isCur ? '진행 중' : STATUS[it.status];
+      else right = off ? '생략' : (strength(it) ? '약 ' + Math.round(planSec(it) / 60) + '분' : '');
+      right += (right ? ' ' : '') + '›';
+    }
+    const act = mode === 'list' && !off ? 'jump' : 'row-sheet';
+    return '<li class="row xr' + (off ? ' off' : '') + (isCur ? ' cur' : '') + '"' + (isCur ? ' id="curRow"' : '') + '>' +
+      '<button type="button" class="xr__b" data-act="' + act + '" data-uid="' + it.uid + '"><span class="xr__m"><span class="xr__n">' + esc(d.name) + tags + '</span>' +
+      '<span class="xr__s">' + esc(sub) + '</span></span>' + (right ? '<span class="xr__r">' + right + '</span>' : '') + '</button>' +
+      (mode === 'edit' ? '<button type="button" class="row__handle" aria-label="끌어서 순서 바꾸기">≡</button>' : '') + '</li>';
+  }
+
+  const isCut = (it) => it.auto && it.status === 'skipped';
+
   function rowsHTML(mode) {
-    const live = mode !== 'plan';
-    const curUid = live ? D().current : null;
-    return '<ol class="rows">' + items().map((it) => {
-      const d = def(it);
-      const isCur = it.uid === curUid;
-      let status = '';
-      if (live) status = '<span class="tag tag--' + (isCur ? 'active' : it.status) + '">' + (isCur ? '진행 중' : STATUS[it.status]) + '</span>';
-      else if (it.priority === 'optional') status = '<span class="tag">선택</span>';
-      const sub = live && it.sets.length ? doneText(it) : targetText(it) + (mode === 'plan' && strength(it) ? ' · 약 ' + Math.round(planSec(it) / 60) + '분' : '');
-      const jumpable = mode === 'list' && it.status !== 'skipped';
-      const main = '<span class="row__name">' + esc(d.name) + (unmeasured(it) ? '<span class="tag">미측정</span>' : '') + status + '</span>' +
-        '<span class="row__sub">' + esc(sub) + '</span>' +
-        (mode === 'plan' && it.status !== 'skipped' && !unmeasured(it) ? '<span class="row__reason">' + esc((it.pre || '') + E.recommend(it.exercise_id, S.sessions, S.increments).reason) + '</span>' : '');
-      return '<li class="row' + (it.status === 'skipped' ? ' is-skipped' : '') + (isCur ? ' is-current' : '') + '"' + (isCur ? ' id="curRow"' : '') + '>' +
-        (jumpable
-          ? '<button type="button" class="row__main row__main--btn" data-act="jump" data-uid="' + it.uid + '"><span class="row__text">' + main + '</span><span aria-hidden="true">›</span></button>'
-          : '<div class="row__main"><span class="row__text">' + main + '</span></div>') +
-        (mode === 'list' ? '</li>' : '<div class="row__tools">' +
-        '<button type="button" class="btn btn--sm" data-act="swap" data-uid="' + it.uid + '">대체</button>' +
-        '<button type="button" class="btn btn--sm" data-act="skip" data-uid="' + it.uid + '">' + (it.status === 'skipped' ? '복원' : '생략') + '</button>' +
-        '<button type="button" class="btn btn--sm row__handle" aria-label="끌어서 순서 바꾸기">≡</button>' +
-        '</div></li>');
-    }).join('') + '</ol>';
+    const list = items();
+    if (mode === 'edit') return '<ol class="rows">' + list.map((it) => rowHTML(it, mode)).join('') + '</ol>';
+    const cut = list.filter(isCut);
+    return '<ol class="rows">' + list.filter((it) => !isCut(it)).map((it) => rowHTML(it, mode)).join('') +
+      (cut.length ? '<li class="xr off"><button type="button" class="xr__b" data-act="cut-sheet"><span class="xr__m"><span class="xr__n">시간에 맞춰 뺀 운동 ' + cut.length + '개</span>' +
+        '<span class="xr__s">' + esc(cut.map((it) => def(it).name).join(', ')) + '</span></span><span class="xr__r">복원 ›</span></button></li>' : '') + '</ol>';
   }
 
   function doneText(it) {
@@ -487,67 +505,58 @@
 
   function listHTML() {
     const editing = ui.editing;
-    return topbar({ title: '목록', left: iconBtn('back-ex', 'back', '운동으로'), right: textBtn('list-edit', editing ? '완료' : '편집') }) +
-      '<section class="stack">' + timeCardHTML() + rowsHTML(editing ? 'edit' : 'list') +
-      '<button type="button" class="btn" data-act="add">운동 추가</button>' +
-      hx('<button type="button" class="btn" data-act="finish">세션 종료</button>') +
-      '<button type="button" class="btn btn--danger" data-act="abandon">기록 버리고 처음으로</button></section>';
+    return '<div class="screen">' + topbar({ title: '목록', left: iconBtn('back-ex', 'back', '운동으로'), right: textBtn('list-edit', editing ? '완료' : '편집') }) +
+      sbarHTML(true) + rowsHTML(editing ? 'edit' : 'list') +
+      '<div class="dock"><div class="quiet"><button type="button" data-act="add">운동 추가</button>' +
+      '<button type="button" class="danger" data-act="abandon">기록 버리고 처음으로</button></div>' +
+      hx('<button type="button" class="cta" data-act="finish">세션 종료</button>') + '</div></div>';
   }
 
   function planHTML() {
-    return topbar({ title: tplName(D().session_type) + ' 세션', right: textBtn('plan-cancel', '취소') }) +
-      '<section class="stack stack--lead"><p class="lead">' + esc(D().date) + '</p>' + timeCardHTML() + lastSessionHTML() + rowsHTML('plan') +
-      '<button type="button" class="btn" data-act="add">운동 추가</button>' +
-      hx('<button type="button" class="btn btn--primary btn--lg" data-act="plan-start">시작</button>') + '</section>';
+    const editing = ui.editing;
+    const planned = Math.round(items().filter(strength).reduce((a, it) => a + planSec(it), 0) / 60);
+    return '<div class="screen">' + topbar({ title: tplName(D().session_type) + ' 세션 · ' + D().date, right: textBtn('plan-cancel', '취소') }) +
+      '<div class="tm">' + hx('<button type="button" class="rnd rnd--sm" data-act="time" data-dir="-1" aria-label="운동 시간 줄이기">−</button>') +
+      '<div class="tm__c"><span class="lbl">운동 시간</span><button type="button" class="tm__v" data-act="time-edit"><b>' + targetMin() + '</b><u>분</u></button>' +
+      '<p class="tm__s">근력 예상 ' + planned + '분</p></div>' +
+      hx('<button type="button" class="rnd rnd--sm" data-act="time" data-dir="1" aria-label="운동 시간 늘리기">+</button>') + '</div>' +
+      sbarHTML() + lastSessionHTML() + rowsHTML(editing ? 'edit' : 'plan') +
+      '<div class="dock"><div class="quiet"><button type="button" data-act="add">운동 추가</button>' +
+      '<button type="button" data-act="list-edit">' + (editing ? '순서 완료' : '순서 바꾸기') + '</button></div>' +
+      hx('<button type="button" class="cta" data-act="plan-start">시작</button>') + '</div></div>';
   }
 
   function exerciseHTML() {
     const it = cur();
     const d = def(it);
     const nx = nextPending(it.uid);
-
-    const card = '<div class="card ex"><h2>' + esc(d.name) + '</h2>' + targetsHTML(it, d) + '</div>';
-
-    const panel = ui.phase === 'rest' ? restHTML(it, nx) : inputHTML(it);
-    const memo = ui.phase === 'rest' ? '<button type="button" class="memo-row" data-act="note-edit"><span class="memo-row__n">메모</span>' +
-      '<span class="memo-row__t">' + (it.note ? esc(it.note) : '오늘 메모 추가') + '</span><span aria-hidden="true">›</span></button>' : '';
-    const sets = setsHTML(it);
-    const log = sets || memo ? '<div class="card ex-log">' + sets + memo + '</div>' : '';
-    return topbar({ band: true, right: textBtn('open-list', '목록') }) + '<section class="stack">' + card + panel + log + lastMemoHTML(it) + prevHTML(it) + '</section>';
+    const live = items().filter((x) => x.status !== 'skipped' || x.uid === it.uid);
+    const rest = ui.phase === 'rest' && !isTimed(it);
+    const t = ui.timer;
+    const pct = t.total ? Math.min(100, timerLeft() / t.total * 100) : 0;
+    return '<div class="screen' + (rest ? ' screen--rest' : '') + '">' +
+      (rest ? '<div class="restfill" id="restFill" style="height:' + pct + '%"></div>' : '') +
+      topbar({ sub: tplName(D().session_type) + ' · ' + (live.indexOf(it) + 1) + ' / ' + live.length + '번째 운동', right: textBtn('open-list', '목록') }) +
+      sbarHTML() +
+      '<button type="button" class="name" data-act="ex-sheet"><span>' + esc(d.name) + '</span>' + icon('down') + '</button>' +
+      (isTimed(it) ? cardioHTML(it, nx) : rest ? restHTML(it, nx) : inputHTML(it)) + '</div>';
   }
 
-  function stepper(label, act, val, note, off, extra) {
-    const dis = off ? ' disabled' : '';
-    return '<div class="tgt tgt--wide"><div class="head-row"><span class="label">' + label + '</span>' + (extra || '') + '</div>' +
-      '<div class="stepper">' + hx('<button type="button" class="btn btn--icon" data-act="' + act + '" data-dir="-1" aria-label="' + label + ' 줄이기"' + dis + '>−</button>') +
-      '<button type="button" class="stepper__val" data-act="' + act + '-edit">' + esc(val) + '</button>' +
-      hx('<button type="button" class="btn btn--icon" data-act="' + act + '" data-dir="1" aria-label="' + label + ' 늘리기"' + dis + '>+</button>') + '</div>' +
-      (note ? '<span class="muted small">' + esc(note) + '</span>' : '') + '</div>';
+  function wParts(d, kg) {
+    const m = /^([\d.]+)(.*)$/.exec(E.fmtW(Object.assign({}, d, { load: 'weight' }), kg));
+    return m ? { n: m[1], u: m[2] } : { n: '', u: '' };
   }
 
-  const unitBtn = () => hx('<button type="button" class="btn btn--sm" data-act="unit-toggle" aria-label="무게 단위 바꾸기">' + S.settings.weight_unit + '</button>');
-
-  function targetsHTML(it, d) {
-    const cell = (label, val) => '<div class="tgt"><span class="label">' + label + '</span><span class="tgt__v">' + esc(val) + '</span></div>';
-    if (isTimed(it)) return '<div class="tgts">' + stepper('시간', 'dur', E.fmtMin(it.target.duration_sec)) + '</div>';
-    const none = it.target.weight_kg == null;
-    return '<div class="tgts">' + stepper(d.load === 'assist' ? '보조 무게' : '무게', 'w', none ? '무게 미정' : E.fmtW(Object.assign({}, d, { load: 'weight' }), it.target.weight_kg), weightSub(d, it.target.weight_kg), none, unitBtn()) +
-      cell('횟수', it.target.reps + '회') + cell('세트', it.target.sets + '세트') + '</div>';
+  function setLi(d, s, label, act) {
+    const body = '<span class="li__n">' + label + '</span><span class="li__t">' + esc(setText(d, s)) + (s.note ? '<small>' + esc(s.note) + '</small>' : '') + '</span>' +
+      '<span class="li__r">' + (s.feel ? FEEL[s.feel] : '') + (act ? ' ›' : '') + '</span>';
+    const cls = 'li' + (s.is_warmup ? ' warm' : '');
+    return act ? '<button type="button" class="' + cls + '" ' + act + '>' + body + '</button>' : '<div class="' + cls + '">' + body + '</div>';
   }
 
-  function setRowHTML(d, s, label) {
-    return '<span class="set__n">' + label + '</span>' +
-      '<span class="set__v">' + esc(setText(d, s)) + '</span>' +
-      (s.feel ? '<span class="set__feel">' + FEEL[s.feel] + '</span>' : '') +
-      (s.note ? '<span class="set__note set__note--below">' + esc(s.note) + '</span>' : '');
-  }
-
-  function setsHTML(it) {
-    if (!it.sets.length || isTimed(it)) return '';
-    const d = def(it);
+  function setLis(d, sets, actOf) {
     let n = 0;
-    return '<ol class="sets">' + it.sets.map((s, i) => '<li><button type="button" class="set' + (s.is_warmup ? ' set--warm' : '') + '" data-act="edit-set" data-i="' + i + '">' +
-      setRowHTML(d, s, s.is_warmup ? '웜업' : (++n) + '세트') + '</button></li>').join('') + '</ol>';
+    return (sets || []).map((s, i) => setLi(d, s, s.is_warmup ? '웜업' : String(++n), actOf ? actOf(i) : '')).join('');
   }
 
   function lastOf(id) {
@@ -556,84 +565,109 @@
     return { date: h.date, ex: h.ex, next: h.ex.next_note || null };
   }
 
-  function lastMemoHTML(it) {
-    const last = lastOf(it.exercise_id);
-    if (!last || (!last.ex.note && !last.next)) return '';
-    return '<div class="card memo-card"><span class="label">지난 메모 · ' + esc(last.date) + '</span>' +
-      (last.ex.note ? '<p>' + esc(last.ex.note) + '</p>' : '') +
-      (last.next ? '<p>다음 목표: ' + esc(last.next) + '</p>' : '') + '</div>';
-  }
-
   function lastSessionHTML() {
     const same = S.sessions.filter((x) => x.session_type === D().session_type);
     const last = same[same.length - 1];
     const watch = last ? last.watch_note : null;
     if (!last || (!last.notes && !watch)) return '';
-    return '<div class="card memo-card"><span class="label">지난 ' + esc(tplName(last.session_type)) + ' 세션 메모 · ' + esc(last.date) + '</span>' +
+    return '<div class="memo"><span class="lbl">지난 ' + esc(tplName(last.session_type)) + ' 세션 메모 · ' + esc(last.date) + '</span>' +
       (last.notes ? '<p>' + esc(last.notes) + '</p>' : '') +
       (watch ? '<p>지켜볼 것: ' + esc(watch) + '</p>' : '') + '</div>';
   }
 
-  function inputHTML(it) {
-    if (isTimed(it)) {
-      return '<div class="panel panel--input">' +
-        hx('<button type="button" class="btn btn--primary btn--lg" data-act="cardio-done">' + (it.sets.length ? '시간 다시 기록' : '기록') + '</button>') +
-        navHTML(it, nextPending(it.uid)) + '</div>';
-    }
-    const target = it.target.reps;
-    const counter = hx('<button type="button" class="counter stage--' + E.stage(ui.reps, target) + '" data-act="tap-full">' +
-      '<span class="count__n">' + ui.reps + '</span><span class="count__t">눌러서 +1 · 목표 ' + target + '회</span></button>') +
-      '<div class="row2">' + hx('<button type="button" class="btn" data-act="tap-undo"' + (undoStack.length ? '' : ' disabled') + '>되돌리기</button>') +
-      hx('<button type="button" class="btn" data-act="tap-fill"' + (target ? '' : ' disabled') + '>+' + target + '</button>') + '</div>';
-    return '<div class="panel panel--input">' + counter +
-      hx('<button type="button" class="btn btn--primary btn--lg" data-act="record">' + (workDone(it) + 1) + '세트 기록</button>') + '</div>';
-  }
-
-  function navHTML(it, nx, quiet) {
-    const done = !quiet && (isTimed(it) ? it.sets.length > 0 : workDone(it) >= it.target.sets);
-    if (!nx) {
-      return hx('<button type="button" class="btn' + (done ? ' btn--primary btn--lg' : '') + '" data-act="finish">세션 종료</button>');
-    }
-    return hx('<button type="button" class="btn' + (done ? ' btn--primary btn--lg' : '') + '" data-act="next-ex">다음 운동으로 · ' + esc(def(nx).name) + '</button>');
-  }
-
-  function restHTML(it, nx) {
-    const left = timerLeft();
-    const t = ui.timer;
-    let feel = '';
-    if (ui.feelIdx != null && it.sets[ui.feelIdx]) {
-      feel = '<div class="feel"><p class="label">방금 세트 어땠어요?</p><div class="row3">' +
-        Object.keys(FEEL).map((k) => hx('<button type="button" class="btn" data-act="feel" data-v="' + k + '">' + FEEL[k] + '</button>')).join('') +
-        '</div></div>';
-    }
-    const up = timeUp();
-    const done = up || workDone(it) >= it.target.sets;
-    const nextSet = hx('<button type="button" class="btn' + (done ? '' : ' btn--primary btn--lg') + '" data-act="next-set">' + (done ? '한 세트 더' : '다음 세트 시작') + '</button>');
-    return '<div class="panel panel--rest">' + feel +
-      (up ? '<p class="note">운동 시간 ' + targetMin() + '분이 됐어요.</p>' : '') +
-      (ui.msg ? '<p class="note">' + esc(ui.msg) + '</p>' : '') +
-      (def(it).cue ? '<p class="muted small" id="cue">' + esc(def(it).cue) + '</p>' : '') +
-      '<div class="timer"><span class="label">휴식</span><span class="timer__t" id="timerText">' + mmss(left) + '</span>' +
-      '<div class="timer__track"><div class="timer__bar" id="timerBar" style="transform:scaleX(' + (t.total ? left / t.total : 0) + ')"></div></div></div>' +
-      '<div class="row3">' + hx('<button type="button" class="btn" data-act="t-toggle">' + (t.running ? '일시정지' : '시작') + '</button>') +
-      hx('<button type="button" class="btn" data-act="t-reset">리셋</button>') +
-      hx('<button type="button" class="btn" data-act="t-add">+30초</button>') + '</div>' +
-      (up ? hx('<button type="button" class="btn btn--primary btn--lg" data-act="finish">세션 종료</button>') : '') +
-      (isTimed(it) ? '' : nextSet) + (up && !nx ? '' : navHTML(it, nx, up)) + '</div>';
-  }
-
-  function prevHTML(it) {
+  function prevRowHTML(it) {
     const h = E.history(S.sessions, it.exercise_id)[0];
     if (!h) return '';
     const d = def(it);
-    let body;
-    if (E.isTimed(d)) body = '<p>' + E.fmtMin(h.ex.sets[0].duration_sec) + '</p>';
+    let text;
+    if (E.isTimed(d)) text = '<b>지난번 ' + E.fmtMin(h.ex.sets[0].duration_sec) + '</b>';
     else {
-      let n = 0;
-      body = '<ol class="sets">' + (h.ex.sets || []).map((s) => '<li class="set set--static' + (s.is_warmup ? ' set--warm' : '') + '">' +
-        setRowHTML(d, s, s.is_warmup ? '웜업' : (++n) + '세트') + '</li>').join('') + '</ol>';
+      const ws = (h.ex.sets || []).filter((x) => !x.is_warmup);
+      if (!ws.length) return '';
+      const same = ws.every((x) => x.weight_kg === ws[0].weight_kg);
+      text = same
+        ? '<b>지난번 ' + ws.map((x) => x.reps).join(' · ') + '회</b> ' + esc(E.fmtW(d, ws[0].weight_kg))
+        : '<b>지난번 ' + ws.length + '세트</b> ' + esc(E.fmtW(d, ws[ws.length - 1].weight_kg)) + '까지';
     }
-    return '<details class="card prev-wrap"><summary>직전 기록 · ' + esc(h.date) + '</summary>' + body + '</details>';
+    return '<button type="button" class="prev" data-act="ex-sheet">' + text + '<span>' + esc(h.date) + ' ›</span></button>';
+  }
+
+  function inputHTML(it) {
+    const d = def(it);
+    const n = workDone(it) + 1;
+    const total = Math.max(it.target.sets, n);
+    let pips = '';
+    for (let i = 0; i < Math.min(total, 8); i++) pips += '<i' + (i < n - 1 ? ' class="d"' : i === n - 1 ? ' class="c"' : '') + '></i>';
+    const head = '<div class="setno"><span class="pips">' + pips + '</span>' + n + '세트 <em>/ ' + it.target.sets + '</em></div>';
+    if (unmeasured(it)) {
+      return '<div class="stage">' + head + '<button type="button" class="big big--w" data-act="w-edit"><span class="big__none">무게 미정</span></button>' +
+        '<div class="big"><span class="x">×</span><b>' + it.target.reps + '</b><u>회</u></div></div>' +
+        '<div class="dock"><button type="button" class="cta" data-act="w-edit">시작 무게 정하기</button></div>';
+    }
+    const w = wParts(d, it.target.weight_kg);
+    const side = (d.load === 'assist' ? '<span class="side">보조</span>' : '') + (d.weight_basis === 'per_side' ? '<span class="side">한 쪽</span>' : '');
+    return '<div class="stage">' + head +
+      '<button type="button" class="big big--w" data-act="ex-sheet" aria-label="무게 바꾸기"><b>' + esc(w.n) + '</b><u>' + esc(w.u) + '</u>' + side + '</button>' +
+      '<div class="big"><span class="x">×</span><b>' + ui.reps + '</b><u>회</u></div>' + prevRowHTML(it) + '</div>' +
+      '<div class="dock"><div class="enter">' +
+      hx('<button type="button" class="rnd" data-act="reps" data-dir="-1" aria-label="횟수 줄이기"' + (ui.reps <= 1 ? ' disabled' : '') + '>−</button>') +
+      hx('<button type="button" class="cta" data-act="record">' + ui.reps + '회 했어요</button>') +
+      hx('<button type="button" class="rnd" data-act="reps" data-dir="1" aria-label="횟수 늘리기">+</button>') + '</div></div>';
+  }
+
+  function cardioHTML(it, nx) {
+    const rec = it.sets.length > 0;
+    const min = Math.round((it.target.duration_sec || 0) / 60);
+    const nav = (cls) => hx('<button type="button" class="' + cls + '" data-act="' + (nx ? 'next-ex' : 'finish') + '">' + (nx ? '다음 운동으로 · ' + esc(def(nx).name) : '세션 종료') + '</button>');
+    const enter = (mid) => '<div class="enter">' +
+      hx('<button type="button" class="rnd" data-act="dur" data-dir="-1" aria-label="시간 줄이기">−</button>') + hx(mid) +
+      hx('<button type="button" class="rnd" data-act="dur" data-dir="1" aria-label="시간 늘리기">+</button>') + '</div>';
+    return '<div class="stage"><div class="setno">시간 운동' + (it.priority === 'optional' ? tag('선택') : '') + (rec ? ' <em>기록함</em>' : '') + '</div>' +
+      '<button type="button" class="big big--t" data-act="dur-edit" aria-label="시간 직접 입력"><b>' + min + '</b><u>분</u></button>' + prevRowHTML(it) + '</div>' +
+      '<div class="dock">' + (rec
+        ? enter('<button type="button" class="btn" data-act="cardio-done">' + min + '분으로 다시 기록</button>') + nav('cta')
+        : nav('btn btn--plain') + enter('<button type="button" class="cta" data-act="cardio-done">' + min + '분 했어요</button>')) + '</div>';
+  }
+
+  function restHTML(it, nx) {
+    const d = def(it);
+    const left = timerLeft();
+    const t = ui.timer;
+    const li = it.sets.length - 1;
+    const s = it.sets[li];
+    const up = timeUp();
+    const done = workDone(it) >= it.target.sets;
+    let past = '';
+    if (s) {
+      const label = s.is_warmup ? '방금 웜업' : '방금 ' + workDone(it) + '세트' + (done ? ' · 목표 완료' : '');
+      past = '<div class="past"><div class="past__h"><span class="lbl">' + label + '</span><b>' + esc(setText(d, s)) + '</b>' +
+        '<button type="button" data-act="edit-set" data-i="' + li + '">고치기</button></div><div class="seg">' +
+        Object.keys(FEEL).map((k) => hx('<button type="button"' + (s.feel === k ? ' class="on"' : '') + ' data-act="feel" data-i="' + li + '" data-v="' + k + '">' + FEEL[k] + '</button>')).join('') +
+        '</div></div>';
+    }
+    let next;
+    const block = (l, v, c) => '<div class="next__l">' + l + '</div><div class="next__v">' + esc(v) + '</div>' + (c ? '<p class="next__c">' + esc(c) + '</p>' : '');
+    if (up) next = block('운동 시간', targetMin() + '분이 됐어요', nx ? '남은 운동 · ' + def(nx).name + ' ' + targetText(nx) : '');
+    else if (done) next = nx ? block('다음 운동', def(nx).name, targetText(nx)) : block('다음', '남은 운동 없음', '');
+    else next = block('다음', (workDone(it) + 1) + '세트 · ' + E.fmtW(d, it.target.weight_kg) + ' × ' + it.target.reps + '회', d.cue || '');
+    const moreSet = (cls) => hx('<button type="button" class="' + cls + '" data-act="next-set">한 세트 더</button>');
+    let dock;
+    if (up) {
+      dock = '<div class="duo">' + moreSet('btn') + (nx ? hx('<button type="button" class="btn" data-act="next-ex">다음 운동으로</button>') : '') + '</div>' +
+        hx('<button type="button" class="cta" data-act="finish">세션 종료</button>');
+    } else if (done) {
+      dock = moreSet('btn btn--plain') + hx('<button type="button" class="cta" data-act="' + (nx ? 'next-ex' : 'finish') + '">' + (nx ? '다음 운동으로' : '세션 종료') + '</button>');
+    } else {
+      dock = hx('<button type="button" class="btn btn--plain" data-act="' + (nx ? 'next-ex' : 'finish') + '">' + (nx ? '다음 운동으로 · ' + esc(def(nx).name) : '세션 종료') + '</button>') +
+        hx('<button type="button" class="cta" data-act="next-set">다음 세트 시작</button>');
+    }
+    return past +
+      '<div class="clock"><span class="clock__t' + (left <= 0 ? ' end' : '') + '" id="timerText">' + mmss(left) + '</span><div class="quiet">' +
+      hx('<button type="button" data-act="t-toggle">' + (t.running ? '일시정지' : '시작') + '</button>') +
+      hx('<button type="button" data-act="t-reset">리셋</button>') +
+      hx('<button type="button" data-act="t-add">+30초</button>') + '</div></div>' +
+      '<div class="next">' + next + (ui.msg ? '<p class="next__m">' + esc(ui.msg) + '</p>' : '') + '</div>' +
+      '<div class="dock">' + dock + '</div>';
   }
 
   function buildLog() {
@@ -723,7 +757,7 @@
     const short = st.filter((it) => it.status !== 'skipped' && it.base_sets && workDone(it) < it.base_sets && workDone(it) > 0).map((it) => def(it).name + ' ' + workDone(it) + '/' + it.base_sets);
     if (short.length) lines.push('세트를 덜 한 운동: ' + short.join(', '));
     if (!lines.length) return '';
-    return '<div class="card memo-card"><span class="label">오늘 정리</span><ul class="digest">' + lines.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul></div>';
+    return '<p class="sum__d">' + lines.map((x, i) => (i ? esc(x) : '<b>' + esc(x) + '</b>')).join('<br>') + '</p>';
   }
 
   function summaryHTML() {
@@ -732,22 +766,25 @@
     const rows = items().map((it) => {
       const d = def(it);
       if (it.status === 'skipped' || !it.sets.length) {
-        return '<li class="sum is-skipped"><span class="row__name">' + esc(d.name) + '<span class="tag">' + (it.status === 'skipped' ? '생략' : '기록 없음') + '</span></span></li>';
+        return '<li class="sr off"><div class="sr__h"><b>' + esc(d.name) + '</b><span>' + (it.status === 'skipped' ? '생략' : '기록 없음') + '</span></div></li>';
       }
       let lines;
       if (E.isTimed(d)) lines = E.fmtMin(it.target.duration_sec);
       else lines = it.sets.map((s) => (s.is_warmup ? '웜업 ' : '') + setText(d, s)).join(', ');
       const rec = E.recommend(it.exercise_id, future, S.increments);
       const recText = E.isTimed(d) ? E.fmtMin(rec.duration_sec) : E.fmtW(d, rec.weight) + ' × ' + rec.reps + '회 × ' + rec.sets + '세트';
-      return '<li class="sum"><span class="row__name">' + esc(d.name) + '</span><span class="row__sub">' + esc(lines) + '</span>' +
-        (it.note ? '<span class="row__sub">메모: ' + esc(it.note) + '</span>' : '') +
-        '<span class="row__reason">다음 ' + esc(recText) + '</span></li>';
+      return '<li class="sr"><div class="sr__h"><b>' + esc(d.name) + '</b><span>다음 <i>' + esc(recText) + '</i></span></div><p>' + esc(lines) + '</p>' +
+        (it.note ? '<p>메모: ' + esc(it.note) + '</p>' : '') + '</li>';
     }).join('');
-    return topbar({ title: '세션 요약', left: iconBtn('sum-back', 'back', '운동으로') }) +
-      '<section class="stack stack--lead"><p class="lead">' + esc(log.date + ' · ' + Math.round(log.duration_sec / 60) + '분') + '</p>' + digestHTML(future) + '<ol class="rows">' + rows + '</ol>' +
-      '<label class="field"><span class="label">체중 (kg)</span><input class="input" type="number" inputmode="decimal" step="0.1" id="bw" value="' + esc(log.bodyweight_kg == null ? '' : log.bodyweight_kg) + '"></label>' +
-      '<label class="field"><span class="label">메모</span><textarea class="input" id="notes" rows="3">' + esc(log.notes || '') + '</textarea></label>' +
-      '<button type="button" class="btn btn--primary btn--lg" data-act="sum-save">저장</button></section>';
+    const bw = log.bodyweight_kg;
+    return '<div class="screen">' + topbar({ title: '세션 요약', left: iconBtn('sum-back', 'back', '운동으로') }) +
+      '<div class="sum"><span class="lbl">' + esc(log.date + ' · ' + tplName(log.session_type)) + '</span>' +
+      '<div class="sum__v"><b>' + Math.round(log.duration_sec / 60) + '</b><u>분</u></div>' + digestHTML(future) +
+      (log.notes ? '<p class="sum__d">메모: ' + esc(log.notes) + '</p>' : '') + '</div>' +
+      '<ol class="rows">' + rows + '</ol>' +
+      '<div class="dock"><div class="duo"><button type="button" class="btn" data-act="sum-bw">체중' + (bw == null ? ' 입력' : '<b>' + esc(bw) + 'kg</b>') + '</button>' +
+      '<button type="button" class="btn" data-act="sum-note">' + (log.notes ? '메모 고치기' : '메모 추가') + '</button></div>' +
+      '<button type="button" class="cta" data-act="sum-save">저장</button></div></div>';
   }
 
   function openSheet(kind, arg) {
@@ -780,24 +817,84 @@
     if (k === 'swap' || k === 'add') {
       html = sheetHead(k === 'swap' ? '운동 대체' : '운동 추가') + pickerHTML(k, ui.sheetArg);
     } else if (k === 'set') {
-      html = sheetHead('세트 수정') + setFormHTML(ui.sheetArg);
+      html = setFormHTML(ui.sheetArg);
     } else if (k === 'note') {
-      html = sheetHead(def(cur()).name + ' 메모') + '<div class="stack-sm">' +
-        '<label class="field"><span class="label">오늘 메모</span><textarea class="input" id="exNote" rows="4">' + esc(cur().note || '') + '</textarea></label>' +
-        '<button type="button" class="btn btn--primary" data-act="note-save">저장</button></div>';
+      html = sheetHead(def(cur()).name + ' 메모') +
+        '<label class="field"><span class="sec">오늘 메모</span><textarea class="input" id="exNote" rows="4">' + esc(cur().note || '') + '</textarea></label>' +
+        '<button type="button" class="cta" data-act="note-save">저장</button>';
+    } else if (k === 'snote') {
+      html = sheetHead('세션 메모') +
+        '<label class="field"><span class="sec">오늘 세션 메모</span><textarea class="input" id="sNotes" rows="4">' + esc(D().notes || '') + '</textarea></label>' +
+        '<button type="button" class="cta" data-act="snote-save">저장</button>';
+    } else if (k === 'ex') {
+      html = exSheetHTML(cur());
+    } else if (k === 'row') {
+      html = rowSheetHTML(ui.sheetArg);
+    } else if (k === 'cut') {
+      html = cutSheetHTML();
     } else if (k === 'exset') {
       html = sheetHead(def(cur()).name + ' 설정') + exSetHTML(cur());
     } else if (k === 'settings') {
       html = sheetHead('설정') + settingsHTML();
     } else if (k === 'export') {
-      html = sheetHead('기록 복사') + '<div class="stack-sm"><p class="muted small">자동으로 복사하지 못했어요. 아래 내용을 모두 선택해서 복사해 주세요.</p>' +
-        '<textarea class="input" id="exportText" rows="10" readonly>' + esc(ui.exportText || '') + '</textarea></div>';
+      html = sheetHead('기록 복사') + '<p class="lbl">자동으로 복사하지 못했어요. 아래 내용을 모두 선택해서 복사해 주세요.</p>' +
+        '<textarea class="input" id="exportText" rows="10" readonly>' + esc(ui.exportText || '') + '</textarea>';
     }
     sheet.innerHTML = '<div class="sheet__body">' + html + '</div>';
     sheet.querySelectorAll('input,select,textarea').forEach((el) => {
       if (!(el.id in saved)) return;
       if (el.type === 'checkbox') el.checked = saved[el.id]; else el.value = saved[el.id];
     });
+    const ff = document.getElementById('fF');
+    if (ff) sheet.querySelectorAll('[data-act="f-feel"]').forEach((b) => b.classList.toggle('on', b.dataset.v === ff.value));
+  }
+
+  function exSheetHTML(it) {
+    const d = def(it);
+    let html = sheetHead(d.name);
+    if (!isTimed(it)) {
+      const none = it.target.weight_kg == null;
+      const w = wParts(d, it.target.weight_kg);
+      const step = S.settings.weight_unit === 'lbs' ? '5lbs' : E.round(Math.abs(d.increment || 1)) + 'kg';
+      html += '<div class="sec">' + (d.load === 'assist' ? '보조 무게' : '무게') + (d.weight_basis === 'per_side' ? ' · 한 쪽' : '') + '</div>' +
+        '<div class="wrow"><button type="button" class="rnd rnd--sm" data-act="w" data-dir="-1" aria-label="무게 줄이기"' + (none ? ' disabled' : '') + '>−</button>' +
+        '<button type="button" class="v' + (none ? ' none' : '') + '" data-act="w-edit">' + (none ? '무게 미정' : esc(w.n) + '<u>' + esc(w.u) + '</u>') + '</button>' +
+        '<button type="button" class="rnd rnd--sm" data-act="w" data-dir="1" aria-label="무게 늘리기"' + (none ? ' disabled' : '') + '>+</button>' +
+        '<button type="button" class="unit" data-act="unit-toggle" aria-label="무게 단위 바꾸기">kg ⇄ lbs</button></div>' +
+        '<button type="button" class="li li--sub" data-act="w-edit">증량 폭 ' + step + ' · 직접 입력<span class="li__r">›</span></button>';
+    }
+    html += '<div class="sec">오늘</div>' + (isTimed(it) ? '' : setLis(d, it.sets, (i) => 'data-act="edit-set" data-i="' + i + '"')) +
+      '<button type="button" class="li" data-act="note-edit"><span class="li__n">메모</span><span class="li__t' + (it.note ? '' : ' lbl') + '">' + (it.note ? esc(it.note) : '오늘 메모 추가') + '</span><span class="li__r">›</span></button>';
+    const last = lastOf(it.exercise_id);
+    if (last) {
+      if (last.ex.note || last.next) {
+        html += '<div class="sec">지난 메모 · ' + esc(last.date) + '</div>' +
+          (last.ex.note ? '<p class="note-p">' + esc(last.ex.note) + '</p>' : '') +
+          (last.next ? '<p class="note-p">다음 목표: ' + esc(last.next) + '</p>' : '');
+      }
+      html += '<div class="sec">직전 기록 · ' + esc(last.date) + '</div>' +
+        (isTimed(it) ? '<div class="li">' + E.fmtMin(last.ex.sets[0].duration_sec) + '</div>' : setLis(d, last.ex.sets));
+    }
+    return html;
+  }
+
+  function rowSheetHTML(u) {
+    const it = items()[idxOf(u)];
+    if (!it) return '';
+    const d = def(it);
+    const off = it.status === 'skipped';
+    const why = fullReason(it);
+    return sheetHead(d.name) +
+      '<div class="sec">오늘 목표' + (isTimed(it) ? '' : ' · 약 ' + Math.round(planSec(it) / 60) + '분') + '</div><p class="goal">' + esc(targetText(it)) + '</p>' +
+      (why ? '<div class="sec">이렇게 정한 이유</div><p class="why">' + esc(why) + '</p>' : '') +
+      '<div class="duo"><button type="button" class="btn" data-act="swap" data-uid="' + it.uid + '">다른 운동으로 대체</button>' +
+      '<button type="button" class="btn" data-act="row-skip" data-uid="' + it.uid + '">' + (off ? '복원' : '오늘은 생략') + '</button></div>';
+  }
+
+  function cutSheetHTML() {
+    return sheetHead('시간에 맞춰 뺀 운동') + items().filter(isCut).map((it) =>
+      '<div class="li"><span class="li__t"><b>' + esc(def(it).name) + '</b><small>' + esc(targetText(it)) + '</small></span>' +
+      '<button type="button" class="unit" data-act="cut-restore" data-uid="' + it.uid + '">복원</button></div>').join('');
   }
 
   function pickerHTML(kind, u) {
@@ -816,32 +913,30 @@
       top = top.filter((id) => id !== self).sort((a, b) => get(a).difficulty - get(b).difficulty);
     }
     const rest = all.filter((id) => id !== self && top.indexOf(id) < 0);
-    const pick = (id, showPattern) => '<li><button type="button" class="pick" data-act="pick" data-id="' + id + '">' +
-      '<span>' + esc(get(id).name) + (isNew(id) ? '<span class="tag">미측정</span>' : '') + '</span>' +
-      (showPattern ? '<span class="muted small">' + esc(E.PATTERN_NAME[get(id).pattern]) + '</span>' : '') + '</button></li>';
+    const pick = (id, showPattern) => '<button type="button" class="li" data-act="pick" data-id="' + id + '">' +
+      '<span class="li__t">' + (showPattern ? '<b>' + esc(get(id).name) + '</b>' : esc(get(id).name)) + (isNew(id) ? tag('미측정') : '') + '</span>' +
+      '<span class="li__r">' + (showPattern ? esc(E.PATTERN_NAME[get(id).pattern]) + ' ' : '') + '›</span></button>';
     let html = '';
-    if (top.length) html += '<div class="stack-sm"><p class="label">대체 후보</p><ul class="picks">' + top.map((id) => pick(id, true)).join('') + '</ul></div>';
+    if (top.length) html += '<div class="sec">대체 후보</div>' + top.map((id) => pick(id, true)).join('');
     E.PATTERN_ORDER.forEach((p) => {
       const ids = rest.filter((id) => get(id).pattern === p);
       if (!ids.length) return;
-      html += '<div class="stack-sm"><p class="label">' + esc(E.PATTERN_NAME[p]) + '</p><ul class="picks">' + ids.map((id) => pick(id, false)).join('') + '</ul></div>';
+      html += '<div class="sec">' + esc(E.PATTERN_NAME[p]) + '</div>' + ids.map((id) => pick(id, false)).join('');
     });
-    return html || '<p class="muted">바꿀 수 있는 운동이 없어요.</p>';
+    return html || '<p class="lbl">바꿀 수 있는 운동이 없어요.</p>';
   }
 
   function isNew(id) {
     return !E.hasWeightFor(id, S.sessions);
   }
 
-  function numField(id, labelHTML, kg) {
+  function numInput(id, cls, kg) {
     const has = kg != null && kg !== '';
     const shown = has ? E.kgToDisp(kg, 2) : '';
-    return '<label class="field">' + labelHTML + '<input class="input" id="' + id + '" type="number" inputmode="decimal" step="any" min="0" value="' + esc(shown) + '" data-shown="' + esc(shown) + '" data-kg="' + (has ? esc(kg) : '') + '"></label>';
+    return '<input class="' + cls + '" id="' + id + '" type="number" inputmode="decimal" step="any" min="0" value="' + esc(shown) + '" data-shown="' + esc(shown) + '" data-kg="' + (has ? esc(kg) : '') + '">';
   }
 
-  function weightField(id, label, kg) {
-    return numField(id, '<span class="head-row"><span class="label">' + label + ' (' + S.settings.weight_unit + ')</span>' + unitBtn() + '</span>', kg);
-  }
+  const unitBtn = () => '<button type="button" class="unit" data-act="unit-toggle" aria-label="무게 단위 바꾸기">kg ⇄ lbs</button>';
 
   function fieldKg(id) {
     const el = document.getElementById(id);
@@ -855,44 +950,48 @@
     const d = def(it);
     const needs = !E.hasWeightFor(it.exercise_id, S.sessions);
     const wl = (needs ? '시작 ' : '지금 ') + (d.load === 'assist' ? '보조 무게' : '무게');
-    return '<div class="stack-sm">' +
-      weightField('xW', wl, it.target.weight_kg) +
-      numField('xI', '<span class="label">증량 폭 (' + S.settings.weight_unit + ')</span>', Math.abs(d.increment)) +
-      '<button type="button" class="btn btn--primary" data-act="xset-save">저장</button></div>';
+    const u = S.settings.weight_unit;
+    return '<div class="two"><label class="fld"><span class="fld__l">' + wl + ' (' + u + ')</span>' + numInput('xW', 'fld__i', it.target.weight_kg) + '</label>' +
+      '<label class="fld"><span class="fld__l">증량 폭 (' + u + ')</span>' + numInput('xI', 'fld__i', Math.abs(d.increment)) + '</label></div>' +
+      '<div class="wrow">' + unitBtn() + '</div>' +
+      '<button type="button" class="cta" data-act="xset-save">' + (needs ? '이 무게로 시작' : '저장') + '</button>';
   }
 
   function setFormHTML(i) {
     const it = cur();
     const d = def(it);
     const s = it.sets[i];
-    return '<div class="stack-sm">' +
-      weightField('fW', d.load === 'assist' ? '보조 무게' : '무게', s.weight_kg) +
-      '<label class="field"><span class="label">횟수</span><input class="input" id="fR" type="number" inputmode="numeric" min="0" value="' + s.reps + '"></label>' +
-      '<label class="check"><input type="checkbox" id="fWu"' + (s.is_warmup ? ' checked' : '') + '> 웜업 세트</label>' +
-      '<label class="field"><span class="label">체감</span><select class="select" id="fF"><option value="">없음</option>' +
-      Object.keys(FEEL).map((k) => '<option value="' + k + '"' + (s.feel === k ? ' selected' : '') + '>' + FEEL[k] + '</option>').join('') + '</select></label>' +
-      '<label class="field"><span class="label">메모</span><input class="input" id="fN" type="text" value="' + esc(s.note || '') + '"></label>' +
-      '<button type="button" class="btn btn--primary" data-act="set-save" data-i="' + i + '">저장</button>' +
-      '<button type="button" class="btn btn--danger" data-act="set-del" data-i="' + i + '">세트 삭제</button></div>';
+    let n = 0;
+    it.sets.forEach((x, k) => { if (!x.is_warmup && k <= i) n++; });
+    return sheetHead((s.is_warmup ? '웜업' : n + '세트') + ' 고치기') +
+      '<div class="two"><label class="fld"><span class="fld__l">' + (d.load === 'assist' ? '보조 무게' : '무게') + ' (' + S.settings.weight_unit + ')</span>' + numInput('fW', 'fld__i', s.weight_kg) + '</label>' +
+      '<label class="fld"><span class="fld__l">횟수</span><input class="fld__i" id="fR" type="number" inputmode="numeric" min="0" value="' + s.reps + '"></label></div>' +
+      '<div class="sec">체감</div><div class="seg">' +
+      Object.keys(FEEL).map((k) => '<button type="button" data-act="f-feel" data-v="' + k + '">' + FEEL[k] + '</button>').join('') + '</div>' +
+      '<input type="hidden" id="fF" value="' + esc(s.feel || '') + '">' +
+      '<div class="sec"></div><label class="li li--first"><span>웜업 세트</span><input type="checkbox" class="sw" id="fWu"' + (s.is_warmup ? ' checked' : '') + '></label>' +
+      '<div class="li">' + unitBtn() + '</div>' +
+      '<label class="field"><span class="sec">메모</span><input class="input" id="fN" type="text" value="' + esc(s.note || '') + '"></label>' +
+      '<button type="button" class="cta" data-act="set-save" data-i="' + i + '">저장</button>' +
+      '<button type="button" class="btn btn--plain danger" data-act="set-del" data-i="' + i + '">세트 삭제</button>';
   }
 
   function settingsHTML() {
     const st = S.settings;
     const last = S.sessions[S.sessions.length - 1];
-    return '<div class="stack-sm">' +
-      '<label class="field"><span class="label">체중 (kg)</span><input class="input" id="sBw" type="number" inputmode="decimal" step="0.1" value="' + esc(st.bodyweight_kg == null ? '' : st.bodyweight_kg) + '"></label>' +
-      '<label class="check"><input type="checkbox" id="sSound"' + (st.sound ? ' checked' : '') + '> 휴식 끝 소리</label>' +
-      '<label class="check"><input type="checkbox" id="sHaptic"' + (st.haptic ? ' checked' : '') + '> 햅틱</label>' +
-      '<button type="button" class="btn btn--primary" data-act="settings-save">설정 저장</button>' +
-      '<hr><p class="muted small">저장된 세션 ' + S.sessions.length + '개' + (last ? ' · 최근 ' + esc(last.date) : '') + '</p>' +
+    return '<label class="field"><span class="sec">체중 (kg)</span><input class="input" id="sBw" type="number" inputmode="decimal" step="0.1" value="' + esc(st.bodyweight_kg == null ? '' : st.bodyweight_kg) + '"></label>' +
+      '<div class="sec"></div><label class="li li--first"><span>휴식 끝 소리</span><input type="checkbox" class="sw" id="sSound"' + (st.sound ? ' checked' : '') + '></label>' +
+      '<label class="li"><span>햅틱</span><input type="checkbox" class="sw" id="sHaptic"' + (st.haptic ? ' checked' : '') + '></label>' +
+      '<button type="button" class="cta" data-act="settings-save">설정 저장</button>' +
+      '<div class="sec">저장된 세션 ' + S.sessions.length + '개' + (last ? ' · 최근 ' + esc(last.date) : '') + '</div>' +
       '<button type="button" class="btn" data-act="export">기록 복사 (JSON)</button>' +
-      '<button type="button" class="btn btn--danger" data-act="wipe">모든 데이터 지우기</button></div>';
+      '<button type="button" class="btn btn--plain danger" data-act="wipe">모든 데이터 지우기</button>';
   }
 
   function backToExercise() {
     ui.screen = 'main';
     ui.editing = false;
-    if (ui.phase === 'rest' && !ui.timer.running && ui.timer.remaining <= 0 && ui.timer.total) { ui.phase = 'input'; ui.feelIdx = null; }
+    if (ui.phase === 'rest' && !ui.timer.running && ui.timer.remaining <= 0 && ui.timer.total) ui.phase = 'input';
     window.scrollTo(0, 0);
   }
 
@@ -907,7 +1006,6 @@
     window.scrollTo(0, 0);
     D().current = it.uid;
     ui.phase = ui.timer.running ? 'rest' : 'input';
-    ui.feelIdx = null;
     ui.msg = '';
     resetCounters(it);
     ui.askWeight = unmeasured(it);
@@ -918,11 +1016,13 @@
       const date = today();
       const recs = E.buildSession(ds.type, S.sessions, date, S.increments);
       S.draft = { id: uid(), date, session_type: ds.type, phase: 'plan', current: null, items: recs.map(makeItem), target_sec: S.settings.target_sec };
+      ui.editing = false;
       fitToTime(true);
       save();
     },
     'plan-cancel'() {
       if (!confirm('이 세션 계획을 버릴까요?')) return;
+      ui.editing = false;
       S.draft = null;
       save();
     },
@@ -945,6 +1045,7 @@
       const first = items().find((x) => x.status === 'pending');
       if (!first) return toast('남은 운동이 없어요');
       D().phase = 'active';
+      ui.editing = false;
       D().started_at = new Date().toISOString();
       ui.screen = 'main';
       goTo(first);
@@ -1039,9 +1140,16 @@
       });
       save(true);
     },
-    'tap-full'() { remember(); ui.reps++; },
-    'tap-fill'() { remember(); ui.reps += cur().target.reps; },
-    'tap-undo'() { const h = undoStack.pop(); if (h) Object.assign(ui, h); },
+    reps(ds) { ui.reps = Math.max(1, ui.reps + Number(ds.dir)); },
+    'ex-sheet'() { openSheet('ex'); },
+    'row-sheet'(ds) { openSheet('row', ds.uid); },
+    'cut-sheet'() { openSheet('cut'); },
+    'row-skip'(ds) { A.skip(ds); closeSheet(); },
+    'cut-restore'(ds) { A.skip(ds); if (!items().some(isCut)) closeSheet(); },
+    'f-feel'(ds) {
+      const ff = document.getElementById('fF');
+      if (ff) ff.value = ff.value === ds.v ? '' : ds.v;
+    },
     record() {
       const it = cur();
       const reps = ui.reps;
@@ -1058,7 +1166,6 @@
       if (fit.cut.length) said.push('뺀 운동: ' + fit.cut.join(', '));
       if (fit.trimmed.length) said.push('세트를 줄인 운동: ' + fit.trimmed.join(', '));
       if (said.length) ui.msg = (ui.msg ? ui.msg + ' ' : '') + '운동 시간에 맞췄어요. ' + said.join(' · ') + '.';
-      ui.feelIdx = it.sets.length - 1;
       ui.phase = 'rest';
       resetCounters(it);
       startTimer(def(it).rest_sec);
@@ -1066,10 +1173,9 @@
     },
     feel(ds) {
       const it = cur();
-      const s = it.sets[ui.feelIdx];
-      ui.feelIdx = null;
+      const s = it.sets[Number(ds.i)];
       if (!s) return;
-      if (ds.v) s.feel = ds.v; else delete s.feel;
+      if (s.feel === ds.v) delete s.feel; else s.feel = ds.v;
       save();
     },
     't-toggle'() {
@@ -1096,7 +1202,6 @@
     },
     'next-set'() {
       ui.phase = 'input';
-      ui.feelIdx = null;
       ui.msg = '';
       resetCounters(cur());
     },
@@ -1163,7 +1268,6 @@
       if (!confirm('이 세트를 삭제할까요?')) return;
       const it = cur();
       it.sets.splice(Number(ds.i), 1);
-      if (ui.feelIdx != null) ui.feelIdx = null;
       save();
       closeSheet();
     },
@@ -1174,12 +1278,24 @@
       ui.phase = 'rest';
     },
     'sum-save'() {
-      const bw = document.getElementById('bw').value;
-      D().bodyweight_kg = bw === '' ? null : Number(bw);
-      D().notes = document.getElementById('notes').value;
       if (!confirm('이 세션을 기록으로 저장할까요?')) return;
       commitSession();
       toast('저장했어요');
+    },
+    'sum-bw'() {
+      const now = D().bodyweight_kg != null ? D().bodyweight_kg : S.settings.bodyweight_kg;
+      const v = prompt('체중 (kg)', now == null ? '' : now);
+      if (v == null) return;
+      if (v.trim() === '') { D().bodyweight_kg = null; save(); return; }
+      if (isNaN(Number(v)) || Number(v) <= 0) return toast('체중을 확인해 주세요');
+      D().bodyweight_kg = Number(v);
+      save();
+    },
+    'sum-note'() { openSheet('snote'); },
+    'snote-save'() {
+      D().notes = document.getElementById('sNotes').value.trim();
+      save();
+      closeSheet();
     },
     settings() { openSheet('settings'); },
     'settings-save'() {
