@@ -330,6 +330,37 @@
     return { sessions, replaced };
   }
 
+  function firstAt(s) {
+    let t = '';
+    (s.exercises || []).forEach((e) => (e.sets || []).forEach((x) => { if (x.at && (!t || x.at < t)) t = x.at; }));
+    return t;
+  }
+
+  function shape(s) {
+    return (s.exercises || []).map((e) => e.exercise_id + ':' + (e.sets || []).length).join(',');
+  }
+
+  function sameSession(a, b) {
+    if (a.id === b.id) return true;
+    if (a.date !== b.date || a.session_type !== b.session_type) return false;
+    const fa = firstAt(a);
+    const fb = firstAt(b);
+    if (fa && fb) return fa === fb;
+    if (a.started_at && b.started_at) return a.started_at === b.started_at;
+    return shape(a) === shape(b);
+  }
+
+  function addMissing(existing, incoming) {
+    const sessions = existing.slice();
+    let added = 0;
+    incoming.forEach((s) => {
+      if (sessions.some((x) => sameSession(x, s))) return;
+      sessions.push(s);
+      added++;
+    });
+    return { sessions: sessions.sort(sessionOrder), added };
+  }
+
   function parseImport(data, catalog, opt) {
     let list = null;
     let version = 1;
@@ -353,7 +384,7 @@
   const Data = {
     VERSION, LEGACY_LB, newId, round2, lbToKg, defaultSettings, emptyStore, sessionOrder,
     migrateSession, migrateSessions, migrateDraft, migrateStore, migratePrefs, cleanIncrements, cleanSettings,
-    checkSession, checkList, mergeSessions, parseImport,
+    checkSession, checkList, mergeSessions, sameSession, addMissing, parseImport,
   };
   root.Data = Data;
   if (typeof module !== 'undefined' && module.exports) module.exports = Data;

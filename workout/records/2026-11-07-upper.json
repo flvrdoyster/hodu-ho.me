@@ -1,0 +1,140 @@
+{
+  "date": "2026-11-07",
+  "session_type": "upper",
+  "bodyweight_kg": 76,
+  "notes": "랫풀다운을 먼저 해서 등이 지친 상태로 진행. 풀업은 생략, 딥은 케이블 푸시다운으로 대체.",
+  "exercises": [
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 35
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 35
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 35
+        }
+      ],
+      "note": "평소 40kg. 세션 첫 운동.",
+      "exercise_id": "lat_pulldown",
+      "next_note": "40kg × 10 × 3"
+    },
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": true,
+          "weight_kg": 8
+        },
+        {
+          "reps": 10,
+          "is_warmup": true,
+          "weight_kg": 10
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 12
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 12
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 12
+        }
+      ],
+      "note": "무게 찾는 날. 8kg, 10kg은 여유 있음. 12kg이 적정.",
+      "exercise_id": "dumbbell_press",
+      "next_note": "12kg로 3세트 모두 10회 → 14kg"
+    },
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 15
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 12.5
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 12.5
+        }
+      ],
+      "note": "15kg은 무거움. 12.5kg이 적정.",
+      "exercise_id": "cable_pushdown",
+      "next_note": "15kg × 10 × 3"
+    },
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 30
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 30
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 30
+        }
+      ],
+      "note": "평소 20kg에서 30kg으로 올림. 조금 무겁지만 적정.",
+      "exercise_id": "seated_cable_row",
+      "next_note": "30kg × 10 × 3 확인 후 35kg"
+    },
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 22.68
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 22.68
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "weight_kg": 22.68
+        }
+      ],
+      "note": "기구가 lb 단위.",
+      "exercise_id": "reverse_pec_deck",
+      "next_note": "50lb × 12~15 × 3"
+    },
+    {
+      "note": "평소 루틴.",
+      "exercise_id": "stationary_bike",
+      "sets": [
+        {
+          "duration_sec": 900
+        }
+      ]
+    }
+  ],
+  "watch_note": "다음에 추가: 숄더 프레스 또는 이두 컬 중 1개",
+  "duration_sec": 2400,
+  "id": "legacy:2026-11-07:upper"
+}

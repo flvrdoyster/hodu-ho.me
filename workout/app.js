@@ -1210,4 +1210,29 @@
   }
   save(true);
   render();
+
+  function loadRepoRecords() {
+    if (typeof fetch !== 'function') return;
+    const get1 = (url) => fetch(url, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    get1('records/index.json').then((list) => {
+      if (!Array.isArray(list)) return;
+      const names = list.filter((n) => typeof n === 'string' && /^[A-Za-z0-9._-]+\.json$/.test(n) && n !== 'index.json');
+      return Promise.all(names.map((n) => get1('records/' + n)));
+    }).then((files) => {
+      if (!files) return;
+      const incoming = [];
+      files.forEach((data) => {
+        if (!data) return;
+        const r = Dt.parseImport(data, window.Catalog);
+        if (!r.error) r.sessions.forEach((s) => incoming.push(s));
+      });
+      if (!incoming.length) return;
+      const m = Dt.addMissing(S.sessions, incoming);
+      if (!m.added) return;
+      S.sessions = m.sessions;
+      save(true);
+      if (!S.draft && !ui.sheetKind) render();
+    }).catch(() => {});
+  }
+  loadRepoRecords();
 })();

@@ -1,0 +1,153 @@
+{
+  "date": "2026-11-11",
+  "session_type": "lower",
+  "bodyweight_kg": 76,
+  "notes": "첫 하체 세션. 데드리프트 외에는 무게 탐색. 왼쪽 무릎이 레그프레스 중 소리 + 약간 걸리는 느낌(통증 없음) → 발 위치를 위로, 깊이를 무릎 90도로 줄이자 해소.",
+  "exercises": [
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": true,
+          "weight_kg": 20
+        },
+        {
+          "reps": 10,
+          "is_warmup": true,
+          "weight_kg": 40
+        },
+        {
+          "reps": 3,
+          "is_warmup": true,
+          "weight_kg": 60
+        },
+        {
+          "reps": 5,
+          "is_warmup": false,
+          "feel": "heavy",
+          "note": "마지막 회 자세 무너짐",
+          "weight_kg": 80
+        },
+        {
+          "reps": 4,
+          "is_warmup": false,
+          "feel": "ok",
+          "note": "자세 유지",
+          "weight_kg": 80
+        },
+        {
+          "reps": 4,
+          "is_warmup": false,
+          "feel": "ok",
+          "weight_kg": 80
+        },
+        {
+          "reps": 4,
+          "is_warmup": false,
+          "feel": "heavy",
+          "note": "여유 없음, 아슬아슬",
+          "weight_kg": 80
+        }
+      ],
+      "note": "75kg 계획이었으나 80kg 선택. 원판 교체가 번거로워 무게를 낮추는 대신 횟수를 4회로 줄임.",
+      "exercise_id": "deadlift",
+      "next_note": "80kg × 4 × 4에서 시작, 세트마다 5회 시도"
+    },
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": true,
+          "feel": "light",
+          "weight_kg": 50
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "note": "왼쪽 무릎 소리 + 걸리는 느낌, 통증 없음",
+          "weight_kg": 70
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "note": "발 위로·무릎 90도로 조정 후 괜찮음",
+          "weight_kg": 70
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "weight_kg": 70
+        }
+      ],
+      "note": "기본 자세: 발판 위쪽, 어깨너비, 무릎 90도까지.",
+      "exercise_id": "leg_press",
+      "next_note": "70kg 여유 있었으면 80~90kg"
+    },
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "weight_kg": 22.68
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "weight_kg": 22.68
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "weight_kg": 22.68
+        }
+      ],
+      "note": "기구가 lb 단위. 20kg 칸이 없어서 lb로 확인 후 50lb 선택.",
+      "exercise_id": "leg_curl",
+      "next_note": "50lb × 12 × 3 → 되면 60lb"
+    },
+    {
+      "sets": [
+        {
+          "reps": 12,
+          "is_warmup": true,
+          "feel": "light",
+          "weight_kg": 13.61
+        },
+        {
+          "reps": 12,
+          "is_warmup": false,
+          "feel": "ok",
+          "note": "무릎 괜찮음",
+          "weight_kg": 22.68
+        },
+        {
+          "reps": 12,
+          "is_warmup": false,
+          "feel": "ok",
+          "weight_kg": 22.68
+        }
+      ],
+      "note": "무릎 때문에 가볍게 시작. 걸리는 느낌 없음.",
+      "exercise_id": "leg_extension",
+      "next_note": "50lb × 12 × 3"
+    },
+    {
+      "note": "평소 루틴.",
+      "exercise_id": "stationary_bike",
+      "sets": [
+        {
+          "duration_sec": 900
+        }
+      ]
+    }
+  ],
+  "watch_note": "왼쪽 무릎 걸림 여부",
+  "duration_sec": 2700,
+  "id": "legacy:2026-11-11:lower"
+}

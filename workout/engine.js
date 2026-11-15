@@ -168,12 +168,13 @@
     return Object.assign(base, { weight: w, reps, reason: last.sets.length ? '지난 세션 ' + repsText(def, w, last.sets) + ' → 같은 값' : '등록된 기준값' });
   }
 
-  function lastUsed(sessions, ids) {
+  function leastRecent(sessions, ids) {
     let best = null;
-    let bestDate = '';
+    let bestDate = null;
     ids.forEach((id) => {
       const h = history(sessions, id);
-      if (h.length && h[0].date > bestDate) { best = id; bestDate = h[0].date; }
+      const d = h.length ? h[0].date : '';
+      if (bestDate === null || d < bestDate) { best = id; bestDate = d; }
     });
     return best;
   }
@@ -218,17 +219,27 @@
 
   function buildSession(type, sessions, today, increments) {
     const tpl = window.TEMPLATES[type];
+    const used = [];
+    let fresh = 0;
     return tpl.slots.map((slot, i) => {
       let id;
       let pre = '';
       if (slot.balance) {
-        const counts = slot.balance.map((x) => setsInDays(sessions, get(x).pattern, today, 7));
+        const pool = slot.balance.filter((x) => used.indexOf(x) < 0);
+        const list = pool.length ? pool : slot.balance;
+        const counts = list.map((x) => setsInDays(sessions, get(x).pattern, today, 7));
         const k = counts.indexOf(Math.min(...counts));
-        id = slot.balance[k];
+        id = list[k];
         pre = '최근 7일 ' + PATTERN_NAME[get(id).pattern] + ' ' + counts[k] + '세트 · ';
       } else {
-        id = lastUsed(sessions, candidates(slot)) || slot.default;
+        const all = candidates(slot);
+        const pool = all.filter((x) => used.indexOf(x) < 0);
+        const known = pool.filter((x) => history(sessions, x).length > 0);
+        const from = pool.length ? (fresh ? (known.length ? known : pool) : pool) : all;
+        id = leastRecent(sessions, from) || slot.default;
+        if (!history(sessions, id).length && all.length > 1) fresh++;
       }
+      used.push(id);
       const r = recommend(id, sessions, increments);
       return Object.assign(r, { slot: i, priority: slot.priority, pre });
     });

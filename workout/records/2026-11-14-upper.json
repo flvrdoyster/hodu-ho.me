@@ -1,0 +1,143 @@
+{
+  "date": "2026-11-14",
+  "session_type": "upper",
+  "exercises": [
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-14T00:53:16.206Z",
+          "weight_kg": 35
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-14T00:55:06.352Z",
+          "weight_kg": 35
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "heavy",
+          "at": "2026-11-14T00:56:55.352Z",
+          "weight_kg": 40
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "heavy",
+          "at": "2026-11-14T00:58:21.231Z",
+          "weight_kg": 40
+        }
+      ],
+      "exercise_id": "lat_pulldown"
+    },
+    {
+      "sets": [
+        {
+          "reps": 8,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-14T01:00:52.007Z",
+          "weight_kg": 12
+        },
+        {
+          "reps": 8,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-14T01:03:01.894Z",
+          "weight_kg": 12
+        },
+        {
+          "reps": 8,
+          "is_warmup": false,
+          "at": "2026-11-14T01:05:47.666Z",
+          "weight_kg": 12
+        }
+      ],
+      "exercise_id": "dumbbell_press"
+    },
+    {
+      "sets": [
+        {
+          "reps": 8,
+          "is_warmup": false,
+          "at": "2026-11-14T01:06:54.252Z",
+          "weight_kg": 30
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-14T01:08:33.194Z",
+          "weight_kg": 30
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-14T01:10:55.708Z",
+          "weight_kg": 30
+        }
+      ],
+      "exercise_id": "seated_cable_row"
+    },
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-14T01:13:25.952Z",
+          "weight_kg": 12.5
+        },
+        {
+          "reps": 8,
+          "is_warmup": false,
+          "feel": "heavy",
+          "at": "2026-11-14T01:14:13.298Z",
+          "weight_kg": 15
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "heavy",
+          "at": "2026-11-14T01:16:04.098Z",
+          "weight_kg": 12.5
+        }
+      ],
+      "exercise_id": "cable_pushdown"
+    },
+    {
+      "sets": [
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "light",
+          "at": "2026-11-14T01:18:01.143Z",
+          "weight_kg": 22.68
+        },
+        {
+          "reps": 8,
+          "is_warmup": false,
+          "feel": "heavy",
+          "at": "2026-11-14T01:19:05.915Z",
+          "weight_kg": 27.22
+        },
+        {
+          "reps": 10,
+          "is_warmup": false,
+          "feel": "ok",
+          "at": "2026-11-14T01:20:53.738Z",
+          "weight_kg": 27.22
+        }
+      ],
+      "exercise_id": "reverse_pec_deck"
+    }
+  ],
+  "duration_sec": 1740,
+  "id": "legacy:2026-11-14:upper"
+}
