@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>답례품 라벨 — 호두정과 (폼텍 LS-3106 한 칸)</title>
+<style>
+  /* ───── 여기만 고치면 됩니다 ───── */
+  :root {
+    --label-w: 64mm;        /* 폼텍 LS-3106 한 칸 */
+    --label-h: 34mm;
+    --safe: 2.5mm;          /* 업체 재단·부착 오차 대비 안쪽 여백 */
+
+    --illust-h: 28mm;       /* 일러스트 높이 */
+    --gap: 2mm;             /* 일러스트와 글자 사이 */
+
+    --title-size: 12pt;     /* 감사합니다 — Bold, 자간 붙임 */
+    --title-spacing: 0.02em;
+    --names-size: 8pt;
+    --msg-size: 6.5pt;
+    --date-size: 6pt;
+  }
+  /* ──────────────────────────────── */
+
+  @font-face { font-family: Pretendard; font-weight: 400; src: url(fonts/Pretendard-Regular.woff2) format("woff2"); }
+  @font-face { font-family: Pretendard; font-weight: 600; src: url(fonts/Pretendard-SemiBold.woff2) format("woff2"); }
+  @font-face { font-family: Pretendard; font-weight: 700; src: url(fonts/Pretendard-Bold.woff2) format("woff2"); }
+
+  @page { size: var(--label-w) var(--label-h); margin: 0; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+
+  .label {
+    width: var(--label-w);
+    height: var(--label-h);
+    box-sizing: border-box;
+    padding: var(--safe);
+    display: flex;
+    align-items: center;
+    gap: var(--gap);
+    overflow: hidden;
+    background: #fff;
+    color: #1a1a1a;
+    font-family: Pretendard, sans-serif;
+    word-break: keep-all;
+  }
+
+  .illust { height: var(--illust-h); width: auto; flex: none; display: block; }
+
+  .text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.2mm;
+  }
+  .title { font-size: var(--title-size); font-weight: 700; letter-spacing: var(--title-spacing); margin-right: calc(-1 * var(--title-spacing)); line-height: 1; margin-bottom: 0.8mm; }
+  .names { font-size: var(--names-size); font-weight: 600; letter-spacing: 0.04em; line-height: 1.2; display: flex; align-items: center; gap: 0.8mm; }
+  .msg   { font-size: var(--msg-size); font-weight: 400; line-height: 1.45; margin: 0; white-space: nowrap; }
+  .date  { font-size: var(--date-size); font-weight: 400; letter-spacing: 0.1em; line-height: 1; }
+</style>
+</head>
+<body>
+  <div class="label">
+    <!-- 일러스트: illust.svg 파일만 바꾸면 반영 -->
+    <img class="illust" src="illust.svg" alt="">
+    <div class="text">
+      <div class="title">감사합니다</div>
+      <div class="names"><span>유정</span><span>·</span><span>석화</span></div>
+      <p class="msg">축하해 주셔서 감사합니다.<br>행복하게 잘 살겠습니다.</p>
+      <div class="date">2026 · 11 · 28</div>
+    </div>
+  </div>
+</body>
+</html>
