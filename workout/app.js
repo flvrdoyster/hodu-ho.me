@@ -668,7 +668,7 @@
         (it.note ? '<span class="row__sub">메모: ' + esc(it.note) + '</span>' : '') +
         '<span class="row__reason">다음 ' + esc(recText) + '</span></li>';
     }).join('');
-    return topbar({ title: '세션 요약', right: textBtn('sum-back', '돌아가기') }) +
+    return topbar({ title: '세션 요약', left: iconBtn('sum-back', 'back', '운동으로') }) +
       '<section class="stack stack--lead"><p class="lead">' + esc(log.date + ' · ' + Math.round(log.duration_sec / 60) + '분') + '</p>' + digestHTML(future) + '<ol class="rows">' + rows + '</ol>' +
       '<label class="field"><span class="label">체중 (kg)</span><input class="input" type="number" inputmode="decimal" step="0.1" id="bw" value="' + esc(log.bodyweight_kg == null ? '' : log.bodyweight_kg) + '"></label>' +
       '<label class="field"><span class="label">메모</span><textarea class="input" id="notes" rows="3">' + esc(log.notes || '') + '</textarea></label>' +
