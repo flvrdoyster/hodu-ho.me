@@ -64,6 +64,19 @@
     return (ex.sets || []).filter((s) => !s.is_warmup && isNum(s));
   }
 
+  function isWarmup(def, goal, sets, w) {
+    if (isTimed(def) || def.load !== 'weight') return false;
+    if (typeof goal !== 'number' || !isFinite(goal) || goal <= 0) return false;
+    if (typeof w !== 'number' || !isFinite(w)) return false;
+    const limit = goal - (def.increment || 0) - 0.1;
+    if (!(w < limit)) return false;
+    return !(sets || []).some((x) => isNum(x) && (x.weight_kg >= limit || !x.is_warmup));
+  }
+
+  function heavier(def, w, base) {
+    return def.load === 'assist' ? w < base - 0.1 : w > base + 0.1;
+  }
+
   function atWorkingWeight(ex) {
     const ws = workSets(ex);
     if (!ws.length) return { w: null, sets: [] };
@@ -274,7 +287,7 @@
   }
 
   window.Engine = {
-    fmtW, fmtMin, isTimed, setUnit, lbsToKg, kgToDisp, dispToKg, fmtInc, eff, eq, history, hasWeightFor, workSets, recommend, buildSession,
+    fmtW, fmtMin, isTimed, setUnit, lbsToKg, kgToDisp, dispToKg, fmtInc, eff, eq, history, hasWeightFor, workSets, isWarmup, heavier, recommend, buildSession,
     candidates, pickable, stage, setSec, localDate, PATTERN_NAME, PATTERN_ORDER, round,
   };
 })();

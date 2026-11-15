@@ -82,6 +82,7 @@
       uid: uid(), exercise_id: rec.exercise_id, slot: rec.slot, priority: rec.priority || 'main',
       status: 'pending', target, base_sets: rec.sets, sets: [],
     };
+    if (!timed) it.goal_kg = rec.weight;
     if (rec.pre) it.pre = rec.pre;
     return it;
   }
@@ -574,6 +575,7 @@
     return '<div class="panel panel--rest">' + feel +
       (up ? '<p class="note">운동 시간 ' + targetMin() + '분이 됐어요.</p>' : '') +
       (ui.msg ? '<p class="note">' + esc(ui.msg) + '</p>' : '') +
+      (def(it).cue ? '<p class="muted small" id="cue">' + esc(def(it).cue) + '</p>' : '') +
       '<div class="timer"><span class="label">휴식</span><span class="timer__t" id="timerText">' + mmss(left) + '</span>' +
       '<div class="timer__track"><div class="timer__bar" id="timerBar" style="transform:scaleX(' + (t.total ? left / t.total : 0) + ')"></div></div></div>' +
       '<div class="row3">' + hx('<button type="button" class="btn" data-act="t-toggle">' + (t.running ? '일시정지' : '시작') + '</button>') +
@@ -945,7 +947,7 @@
       if (Math.abs(inc - base.increment) > 1e-9) S.increments[id] = inc; else delete S.increments[id];
       items().forEach((i) => {
         if (i.exercise_id !== id || i.sets.length || w == null) return;
-        if (needs || i.uid === it.uid) i.target.weight_kg = w;
+        if (needs || i.uid === it.uid) { i.target.weight_kg = w; i.goal_kg = w; }
       });
       save(true);
       closeSheet();
@@ -970,10 +972,11 @@
       const reps = ui.reps;
       if (it.target.weight_kg == null) { toast('무게를 먼저 입력해 주세요'); return openSheet('exset'); }
       if (!reps) return toast('횟수를 먼저 입력해 주세요');
-      const set = { weight_kg: E.dispToKg(E.kgToDisp(it.target.weight_kg, 2)), reps, is_warmup: false, at: new Date().toISOString() };
-      const prev = it.sets.filter((s) => !s.is_warmup).pop();
+      const w = E.dispToKg(E.kgToDisp(it.target.weight_kg, 2));
+      const set = { weight_kg: w, reps, is_warmup: E.isWarmup(def(it), it.goal_kg, it.sets, w), at: new Date().toISOString() };
+      const prev = it.sets[it.sets.length - 1];
       ui.msg = '';
-      if (!set.is_warmup && prev && prev.reps > 0 && reps <= prev.reps * 0.6) ui.msg = '직전 세트보다 40% 넘게 줄었어요. 여기서 마무리해도 좋아요.';
+      if (!set.is_warmup && prev && !prev.is_warmup && !E.heavier(def(it), w, prev.weight_kg) && prev.reps > 0 && reps <= prev.reps * 0.6) ui.msg = '직전 세트보다 40% 넘게 줄었어요. 여기서 마무리해도 좋아요.';
       it.sets.push(set);
       const fit = fitToTime();
       const said = [];
