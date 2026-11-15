@@ -79,6 +79,10 @@ h2 { font-size: 18px; }
 
 .stack { display: flex; flex-direction: column; gap: var(--gap); padding-top: 16px; }
 .topbar + .stack { padding-top: 0; }
+.stack--ex { padding-top: 6px; }
+.ex-log .sets { margin-top: 0; }
+.ex-log .set--memo { margin-top: 6px; }
+.ex-log .sets + .set--memo { margin-top: 6px; }
 .stack-sm { display: flex; flex-direction: column; gap: 8px; }
 
 .card {
@@ -142,21 +146,23 @@ h2 { font-size: 18px; }
   appearance: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   width: 100%;
-  margin-top: calc(12px + env(safe-area-inset-top));
-  padding: 12px 14px;
+  margin-top: env(safe-area-inset-top);
+  padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--card);
   color: var(--ink);
   font: inherit;
+  font-size: 14px;
   text-align: left;
   cursor: pointer;
 }
 .progress__row { display: flex; align-items: center; gap: 8px; width: 100%; }
 
 .band { position: relative; display: flex; gap: 3px; width: 100%; height: 12px; }
+.progress .band { height: 8px; margin-bottom: 2px; }
 .band__seg { position: relative; min-width: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .band__seg.is-current { box-shadow: inset 0 0 0 2px var(--accent); }
 .band__fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); }
@@ -365,3 +371,5 @@ textarea.input { resize: vertical; }
   .timer__bar { transition: none; }
   .row.is-shifting { transition: none; }
 }
+
+.head-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }

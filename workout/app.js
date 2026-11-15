@@ -2,6 +2,8 @@
   const C = window.CATALOG;
   const E = window.Engine;
   const KEY = 'workout_v1';
+  const LEGACY_LB = ['reverse_pec_deck', 'leg_curl', 'leg_extension'];
+  const toKgOnce = (w) => (typeof w === 'number' && isFinite(w) ? E.lbsToKg(w) : w);
   const app = document.getElementById('app');
   const sheet = document.getElementById('sheet');
   const toastEl = document.getElementById('toast');
@@ -11,6 +13,7 @@
   const STATUS = { pending: '대기', done: '완료', skipped: '생략' };
 
   let S = load();
+  E.setUnit(S.settings.weight_unit);
   const undoStack = [];
   const ui = {
     screen: 'main', phase: 'input', feelIdx: null, msg: '',
@@ -18,15 +21,56 @@
     timer: { running: false, endsAt: 0, remaining: 0, total: 0 },
   };
 
+
+  function normalizeSessions(list) {
+    list.forEach((s) => (s.exercises || []).forEach((e) => {
+      if (e.unit === 'lb' || (e.unit == null && LEGACY_LB.indexOf(e.exercise_type) >= 0 && (e.sets || []).some((x) => typeof x.weight === 'number'))) {
+        (e.sets || []).forEach((x) => { x.weight = toKgOnce(x.weight); });
+        e.unit = 'kg';
+      }
+    }));
+    return list;
+  }
+
+  function normalizeDraft(dr) {
+    if (!dr) return dr;
+    (dr.items || []).forEach((it) => {
+      if (LEGACY_LB.indexOf(it.exercise_type) < 0) return;
+      it.cur_weight = toKgOnce(it.cur_weight);
+      if (it.target) it.target.weight = toKgOnce(it.target.weight);
+      (it.sets || []).forEach((x) => { x.weight = toKgOnce(x.weight); });
+    });
+    return dr;
+  }
+
   function load() {
     let d = null;
     try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) { d = null; }
     d = d || {};
+    const sessions = normalizeSessions(Array.isArray(d.sessions) ? d.sessions : []);
+    const draft = d.kg_v === 2 ? d.draft || null : normalizeDraft(d.draft || null);
     return {
-      sessions: Array.isArray(d.sessions) ? d.sessions : [],
-      draft: d.draft || null,
-      settings: Object.assign({ bodyweight_kg: null, sound: true, target_min: 35 }, d.settings),
+      kg_v: 2,
+      sessions,
+      draft,
+      settings: Object.assign({ bodyweight_kg: null, sound: true, target_min: 35, weight_unit: 'kg' }, d.settings),
+      prefs: cleanPrefs(d.prefs),
     };
+  }
+
+  function cleanPrefs(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+    Object.keys(raw).forEach((id) => {
+      const b = C[id];
+      const p = raw[id];
+      if (!b || b.unit === 'min' || !p || typeof p !== 'object') return;
+      const c = {};
+      if (typeof p.increment === 'number' && isFinite(p.increment) && p.increment !== 0 && !E.eq(p.increment, b.increment)) c.increment = p.increment;
+      if (typeof p.start === 'number' && isFinite(p.start) && p.start > 0) c.start = p.start;
+      if (Object.keys(c).length) out[id] = c;
+    });
+    return out;
   }
 
   function save() {
@@ -49,14 +93,14 @@
       uid: uid(), exercise_type: rec.exercise_type, slot: rec.slot, priority: rec.priority || 'main',
       status: 'pending',
       target: { weight: rec.weight, reps: rec.reps, sets: rec.sets, rest_sec: rec.rest_sec, duration: rec.duration },
-      reason: rec.reason,
+      reason: rec.reason, pre: rec.pre || '',
       cur_weight: rec.weight, duration_min: rec.duration != null ? rec.duration : null,
       base_sets: rec.sets, sets: [], note: '',
     };
   }
 
   function retarget(it, id) {
-    const rec = E.recommend(id, S.sessions);
+    const rec = E.recommend(id, S.sessions, S.prefs);
     const fresh = makeItem(Object.assign(rec, { slot: it.slot, priority: it.priority }));
     fresh.uid = it.uid;
     fresh.status = it.status;
@@ -67,7 +111,8 @@
   const items = () => D().items;
   const idxOf = (u) => items().findIndex((x) => x.uid === u);
   const cur = () => items()[idxOf(D().current)];
-  const def = (it) => C[it.exercise_type];
+  const def = (it) => E.eff(it.exercise_type, S.prefs);
+  const unmeasured = (it) => !isCardio(it) && it.cur_weight == null;
   const workDone = (it) => it.sets.filter((s) => !s.is_warmup).length;
   const isCardio = (it) => def(it).unit === 'min';
 
@@ -92,8 +137,6 @@
   function weightSub(d, w) {
     const parts = [];
     if (d.weight_basis === 'per_side') parts.push('한 쪽');
-    const c = E.convert(d, w);
-    if (c) parts.push(c);
     return parts.join(' · ');
   }
 
@@ -272,6 +315,11 @@
     else if (ui.screen === 'list') app.innerHTML = listHTML();
     else app.innerHTML = exerciseHTML();
     if (sheet.open) renderSheet();
+    if (ui.askWeight) {
+      ui.askWeight = false;
+      const c = S.draft && D().phase === 'active' && ui.screen === 'main' ? cur() : null;
+      if (c && unmeasured(c) && !sheet.open) openSheet('exset');
+    }
     if (ui.scrollToCur) {
       ui.scrollToCur = false;
       const row = document.getElementById('curRow');
@@ -381,9 +429,9 @@
       else if (it.priority === 'optional') status = '<span class="tag">선택</span>';
       const sub = live && it.sets.length ? doneText(it) : targetText(it) + (mode === 'plan' && strength(it) ? ' · 약 ' + Math.round(planSec(it) / 60) + '분' : '');
       const jumpable = mode === 'list' && it.status !== 'skipped';
-      const main = '<span class="row__name">' + esc(d.name) + status + '</span>' +
+      const main = '<span class="row__name">' + esc(d.name) + (unmeasured(it) ? '<span class="tag">미측정</span>' : '') + status + '</span>' +
         '<span class="row__sub">' + esc(sub) + '</span>' +
-        (mode === 'plan' && it.status !== 'skipped' ? '<span class="row__reason">' + esc(it.reason) + '</span>' : '');
+        (mode === 'plan' && it.status !== 'skipped' ? '<span class="row__reason">' + esc((it.pre || '') + E.recommend(it.exercise_type, S.sessions, S.prefs).reason) + '</span>' : '');
       return '<li class="row' + (it.status === 'skipped' ? ' is-skipped' : '') + (isCur ? ' is-current' : '') + '"' + (isCur ? ' id="curRow"' : '') + '>' +
         (jumpable
           ? '<button type="button" class="row__main row__main--btn" data-act="jump" data-uid="' + it.uid + '"><span class="row__text">' + main + '</span><span aria-hidden="true">›</span></button>'
@@ -441,26 +489,32 @@
       '<span class="progress__next">' + (nx ? '다음 ' + esc(def(nx).name) : '마지막 운동') + '</span>' +
       '<span class="progress__time' + (timeUp() ? ' is-over' : '') + '" id="elapsed">' + elapsedText() + '</span><span aria-hidden="true">›</span></span>' + bandHTML() + '</button>';
 
-    const card = '<div class="card ex"><h2>' + esc(d.name) + '</h2>' + targetsHTML(it, d) + setsHTML(it) +
-      (ui.phase === 'rest' ? '<button type="button" class="set set--memo" data-act="note-edit"><span class="set__n">메모</span>' +
-      '<span class="set__note">' + (it.note ? esc(it.note) : '오늘 메모 추가') + '</span><span aria-hidden="true">›</span></button>' : '') + '</div>';
+    const card = '<div class="card ex"><h2>' + esc(d.name) + '</h2>' + targetsHTML(it, d) + '</div>';
 
     const panel = ui.phase === 'rest' ? restHTML(it, nx) : inputHTML(it);
-    return '<section class="stack">' + progress + card + panel + lastMemoHTML(it) + prevHTML(it) + '</section>';
+    const memo = ui.phase === 'rest' ? '<button type="button" class="set set--memo" data-act="note-edit"><span class="set__n">메모</span>' +
+      '<span class="set__note">' + (it.note ? esc(it.note) : '오늘 메모 추가') + '</span><span aria-hidden="true">›</span></button>' : '';
+    const sets = setsHTML(it);
+    const log = sets || memo ? '<div class="card ex-log">' + sets + memo + '</div>' : '';
+    return '<section class="stack stack--ex">' + progress + card + panel + log + lastMemoHTML(it) + prevHTML(it) + '</section>';
   }
 
-  function stepper(label, act, val, note) {
-    return '<div class="tgt tgt--wide"><span class="label">' + label + '</span>' +
-      '<div class="stepper"><button type="button" class="btn btn--icon" data-act="' + act + '" data-dir="-1" aria-label="' + label + ' 줄이기">−</button>' +
+  function stepper(label, act, val, note, off, extra) {
+    const dis = off ? ' disabled' : '';
+    return '<div class="tgt tgt--wide"><div class="head-row"><span class="label">' + label + '</span>' + (extra || '') + '</div>' +
+      '<div class="stepper"><button type="button" class="btn btn--icon" data-act="' + act + '" data-dir="-1" aria-label="' + label + ' 줄이기"' + dis + '>−</button>' +
       '<button type="button" class="stepper__val" data-act="' + act + '-edit">' + esc(val) + '</button>' +
-      '<button type="button" class="btn btn--icon" data-act="' + act + '" data-dir="1" aria-label="' + label + ' 늘리기">+</button></div>' +
+      '<button type="button" class="btn btn--icon" data-act="' + act + '" data-dir="1" aria-label="' + label + ' 늘리기"' + dis + '>+</button></div>' +
       (note ? '<span class="muted small">' + esc(note) + '</span>' : '') + '</div>';
   }
+
+  const unitBtn = () => '<button type="button" class="btn btn--sm" data-act="unit-toggle" aria-label="무게 단위 바꾸기">' + S.settings.weight_unit + '</button>';
 
   function targetsHTML(it, d) {
     const cell = (label, val) => '<div class="tgt"><span class="label">' + label + '</span><span class="tgt__v">' + esc(val) + '</span></div>';
     if (isCardio(it)) return '<div class="tgts">' + stepper('시간', 'dur', it.duration_min + '분') + '</div>';
-    return '<div class="tgts">' + stepper(d.assisted ? '보조 무게' : '무게', 'w', E.round(Number(it.cur_weight)) + d.unit, weightSub(d, it.cur_weight)) +
+    const none = it.cur_weight == null;
+    return '<div class="tgts">' + stepper(d.assisted ? '보조 무게' : '무게', 'w', none ? '무게 미정' : E.fmtW(Object.assign({}, d, { assisted: false }), it.cur_weight), weightSub(d, it.cur_weight), none, unitBtn()) +
       cell('횟수', it.target.reps + '회') + cell('세트', it.target.sets + '세트') + '</div>';
   }
 
@@ -579,7 +633,7 @@
       if (!it.sets.length) return;
       exercises.push({
         order: exercises.length + 1, exercise_type: it.exercise_type, equipment: d.equipment, equipment_id: null,
-        unit: d.unit, weight_basis: d.weight_basis,
+        unit: 'kg', weight_basis: d.weight_basis,
         sets: it.sets.map((s, i) => Object.assign({}, s, { set_number: i + 1 })),
         note: it.note || null,
       });
@@ -609,7 +663,7 @@
     const by = { up: [], fail: [], wait: [], down: [] };
     st.forEach((it) => {
       if (it.status === 'skipped' || !workDone(it)) return;
-      const rec = E.recommend(it.exercise_type, future);
+      const rec = E.recommend(it.exercise_type, future, S.prefs);
       if (by[rec.kind]) by[rec.kind].push(def(it).name + ' ' + E.fmtW(def(it), rec.weight));
     });
     if (by.up.length) lines.push('다음에 무게를 올리는 운동: ' + by.up.join(', '));
@@ -635,7 +689,7 @@
       let lines;
       if (d.unit === 'min') lines = it.duration_min + '분';
       else lines = it.sets.map((s) => (s.is_warmup ? '웜업 ' : '') + setText(d, s)).join(', ');
-      const rec = E.recommend(it.exercise_type, future);
+      const rec = E.recommend(it.exercise_type, future, S.prefs);
       const recText = d.unit === 'min' ? rec.duration + '분' : E.fmtW(d, rec.weight) + ' × ' + rec.reps + '회 × ' + rec.sets + '세트';
       return '<li class="sum"><span class="row__name">' + esc(d.name) + '</span><span class="row__sub">' + esc(lines) + '</span>' +
         (it.note ? '<span class="row__sub">메모: ' + esc(it.note) + '</span>' : '') +
@@ -658,10 +712,11 @@
   function closeSheet() {
     if (sheet.open) sheet.close();
     ui.sheetKind = null;
+    ui.formKey = null;
   }
 
   sheet.addEventListener('click', (e) => { if (e.target === sheet) closeSheet(); });
-  sheet.addEventListener('close', () => { ui.sheetKind = null; sheet.innerHTML = ''; });
+  sheet.addEventListener('close', () => { ui.sheetKind = null; ui.formKey = null; sheet.innerHTML = ''; });
 
   function sheetHead(title) {
     return '<div class="sheet__head"><h2>' + esc(title) + '</h2><button type="button" class="btn btn--ghost btn--sm" data-act="close-sheet">닫기</button></div>';
@@ -669,6 +724,10 @@
 
   function renderSheet() {
     const k = ui.sheetKind;
+    const key = k + ':' + ui.sheetArg;
+    const saved = {};
+    if (ui.formKey === key) sheet.querySelectorAll('input,select,textarea').forEach((el) => { saved[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
+    ui.formKey = key;
     let html = '';
     if (k === 'swap' || k === 'add') {
       html = sheetHead(k === 'swap' ? '운동 대체' : '운동 추가') + pickerHTML(k, ui.sheetArg);
@@ -678,38 +737,85 @@
       html = sheetHead(def(cur()).name + ' 메모') + '<div class="stack-sm">' +
         '<label class="field"><span class="label">오늘 메모</span><textarea class="input" id="exNote" rows="4">' + esc(cur().note || '') + '</textarea></label>' +
         '<button type="button" class="btn btn--primary" data-act="note-save">저장</button></div>';
+    } else if (k === 'exset') {
+      html = sheetHead(def(cur()).name + ' 설정') + exSetHTML(cur());
     } else if (k === 'settings') {
       html = sheetHead('설정') + settingsHTML();
     }
     sheet.innerHTML = '<div class="sheet__body">' + html + '</div>';
+    sheet.querySelectorAll('input,select,textarea').forEach((el) => {
+      if (!(el.id in saved)) return;
+      if (el.type === 'checkbox') el.checked = saved[el.id]; else el.value = saved[el.id];
+    });
   }
 
   function pickerHTML(kind, u) {
-    let ids;
+    const all = Object.keys(C).filter(E.pickable);
+    let top = [];
+    let self = null;
     if (kind === 'swap') {
       const it = items()[idxOf(u)];
+      self = it.exercise_type;
       const p = def(it).pattern;
-      ids = Object.keys(C).filter((id) => C[id].pattern === p);
+      top = all.filter((id) => C[id].pattern === p);
       if (it.slot != null && window.TEMPLATES[D().session_type]) {
         const slot = window.TEMPLATES[D().session_type].slots[it.slot];
-        if (slot) E.candidates(slot).forEach((id) => { if (ids.indexOf(id) < 0) ids.push(id); });
+        if (slot) E.candidates(slot).forEach((id) => { if (top.indexOf(id) < 0) top.push(id); });
       }
-      ids = ids.filter((id) => id !== it.exercise_type).sort((a, b) => C[a].difficulty - C[b].difficulty);
-    } else {
-      ids = Object.keys(C);
+      top = top.filter((id) => id !== self).sort((a, b) => C[a].difficulty - C[b].difficulty);
     }
-    if (!ids.length) return '<p class="muted">바꿀 수 있는 운동이 없어요.</p>';
-    return '<ul class="picks">' + ids.map((id) => '<li><button type="button" class="pick" data-act="pick" data-id="' + id + '">' +
-      '<span>' + esc(C[id].name) + '</span><span class="muted small">' + esc(E.PATTERN_NAME[C[id].pattern]) + '</span></button></li>').join('') + '</ul>';
+    const rest = all.filter((id) => id !== self && top.indexOf(id) < 0);
+    const pick = (id, showPattern) => '<li><button type="button" class="pick" data-act="pick" data-id="' + id + '">' +
+      '<span>' + esc(C[id].name) + (isNew(id) ? '<span class="tag">미측정</span>' : '') + '</span>' +
+      (showPattern ? '<span class="muted small">' + esc(E.PATTERN_NAME[C[id].pattern]) + '</span>' : '') + '</button></li>';
+    let html = '';
+    if (top.length) html += '<div class="stack-sm"><p class="label">대체 후보</p><ul class="picks">' + top.map((id) => pick(id, true)).join('') + '</ul></div>';
+    E.PATTERN_ORDER.forEach((p) => {
+      const ids = rest.filter((id) => C[id].pattern === p);
+      if (!ids.length) return;
+      html += '<div class="stack-sm"><p class="label">' + esc(E.PATTERN_NAME[p]) + '</p><ul class="picks">' + ids.map((id) => pick(id, false)).join('') + '</ul></div>';
+    });
+    return html || '<p class="muted">바꿀 수 있는 운동이 없어요.</p>';
+  }
+
+  function isNew(id) {
+    return !E.hasWeightFor(id, S.sessions) && E.eff(id, S.prefs).start == null;
+  }
+
+  function numField(id, labelHTML, kg) {
+    const has = kg != null && kg !== '';
+    const shown = has ? E.kgToDisp(kg, 2) : '';
+    return '<label class="field">' + labelHTML + '<input class="input" id="' + id + '" type="number" inputmode="decimal" step="any" min="0" value="' + esc(shown) + '" data-shown="' + esc(shown) + '" data-kg="' + (has ? esc(kg) : '') + '"></label>';
+  }
+
+  function weightField(id, label, kg) {
+    return numField(id, '<span class="head-row"><span class="label">' + label + ' (' + S.settings.weight_unit + ')</span>' + unitBtn() + '</span>', kg);
+  }
+
+  function fieldKg(id) {
+    const el = document.getElementById(id);
+    if (!el || el.value === '') return null;
+    if (el.value === el.dataset.shown && el.dataset.kg !== '') return Number(el.dataset.kg);
+    const n = Number(el.value);
+    return isFinite(n) ? E.dispToKg(n) : NaN;
+  }
+
+  function exSetHTML(it) {
+    const d = def(it);
+    const needs = !E.hasWeightFor(it.exercise_type, S.sessions);
+    const wl = (needs ? '시작 ' : '지금 ') + (d.assisted ? '보조 무게' : '무게');
+    return '<div class="stack-sm">' +
+      weightField('xW', wl, it.cur_weight) +
+      numField('xI', '<span class="label">증량 폭 (' + S.settings.weight_unit + ')</span>', Math.abs(d.increment)) +
+      '<button type="button" class="btn btn--primary" data-act="xset-save">저장</button></div>';
   }
 
   function setFormHTML(i) {
     const it = cur();
     const d = def(it);
     const s = it.sets[i];
-    const weight = '<input class="input" id="fW" type="number" inputmode="decimal" step="any" value="' + esc(s.weight) + '">';
     return '<div class="stack-sm">' +
-      '<label class="field"><span class="label">' + (d.assisted ? '보조 무게' : '무게') + ' (' + d.unit + ')</span>' + weight + '</label>' +
+      weightField('fW', d.assisted ? '보조 무게' : '무게', s.weight) +
       '<label class="field"><span class="label">횟수</span><input class="input" id="fR" type="number" inputmode="numeric" min="0" value="' + s.reps + '"></label>' +
       '<label class="check"><input type="checkbox" id="fWu"' + (s.is_warmup ? ' checked' : '') + '> 웜업 세트</label>' +
       '<label class="field"><span class="label">체감</span><select class="select" id="fF"><option value="">없음</option>' +
@@ -753,12 +859,13 @@
     ui.feelIdx = null;
     ui.msg = '';
     resetCounters(it);
+    ui.askWeight = unmeasured(it);
   }
 
   const A = {
     'new-session'(ds) {
       const date = today();
-      const recs = E.buildSession(ds.type, S.sessions, date);
+      const recs = E.buildSession(ds.type, S.sessions, date, S.prefs);
       S.draft = { id: uid(), date, session_type: ds.type, phase: 'plan', current: null, items: recs.map(makeItem), notes: '', target_min: S.settings.target_min };
       fitToTime(true);
       save();
@@ -819,7 +926,7 @@
         items()[i] = retarget(items()[i], ds.id);
         if (D().phase === 'active' && D().current === items()[i].uid) resetCounters(items()[i]);
       } else {
-        const rec = E.recommend(ds.id, S.sessions);
+        const rec = E.recommend(ds.id, S.sessions, S.prefs);
         const it = makeItem(Object.assign(rec, { slot: null, priority: 'main' }));
         const list = items();
         if (D().phase === 'active') list.splice(idxOf(D().current) + 1, 0, it);
@@ -842,17 +949,57 @@
     w(ds) {
       const it = cur();
       const d = def(it);
-      const step = Math.abs(d.increment || 1);
-      it.cur_weight = Math.max(0, E.round(Number(it.cur_weight || 0) + step * Number(ds.dir)));
+      const dir = Number(ds.dir);
+      const now = Number(it.cur_weight || 0);
+      it.cur_weight = S.settings.weight_unit === 'lbs'
+        ? Math.max(0, E.dispToKg(E.kgToDisp(now) + 5 * dir))
+        : Math.max(0, E.round(now + Math.abs(d.increment || 1) * dir));
       it.target.weight = it.cur_weight;
       save();
     },
-    'w-edit'() {
+    'w-edit'() { openSheet('exset'); },
+    'xset-save'() {
       const it = cur();
-      const v = prompt('무게 (' + def(it).unit + ')', it.cur_weight == null ? '' : it.cur_weight);
-      if (v == null || v.trim() === '' || isNaN(Number(v))) return;
-      it.cur_weight = E.round(Number(v));
-      it.target.weight = it.cur_weight;
+      const id = it.exercise_type;
+      const base = C[id];
+      const incv = fieldKg('xI');
+      const inc = incv == null ? NaN : incv;
+      const w = fieldKg('xW');
+      if (!(inc > 0)) return toast('증량 폭을 입력해 주세요');
+      if (w != null && !(w >= 0)) return toast('무게를 확인해 주세요');
+      const needs = !E.hasWeightFor(id, S.sessions);
+      if (needs && !(w > 0)) return toast('시작 무게를 입력해 주세요');
+      const p = {};
+      const signed = base.increment < 0 ? -inc : inc;
+      if (Math.abs(signed - base.increment) > 1e-9) p.increment = signed;
+      if (needs) p.start = w;
+      if (Object.keys(p).length) S.prefs[id] = p; else delete S.prefs[id];
+      items().forEach((i) => {
+        if (i.exercise_type !== id || i.sets.length) return;
+        if (needs) {
+          const rec = E.recommend(id, S.sessions, S.prefs);
+          i.target.weight = rec.weight;
+          i.target.reps = rec.reps;
+          i.cur_weight = rec.weight;
+          i.reason = rec.reason;
+        } else if (i.uid === it.uid && w != null) {
+          i.cur_weight = w;
+          i.target.weight = w;
+        }
+      });
+      save();
+      closeSheet();
+    },
+    'unit-toggle'() {
+      const ids = ['xW', 'xI', 'fW'];
+      const kgs = ids.map(fieldKg);
+      const next = S.settings.weight_unit === 'kg' ? 'lbs' : 'kg';
+      S.settings.weight_unit = next;
+      E.setUnit(next);
+      ids.forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (el && kgs[i] != null && isFinite(kgs[i])) el.value = E.kgToDisp(kgs[i], 2);
+      });
       save();
     },
     'tap-full'() { remember(); ui.reps++; },
@@ -861,8 +1008,9 @@
     record() {
       const it = cur();
       const reps = ui.reps;
+      if (it.cur_weight == null) { toast('무게를 먼저 입력해 주세요'); return openSheet('exset'); }
       if (!reps) return toast('횟수를 먼저 입력해 주세요');
-      const set = { set_number: it.sets.length + 1, weight: it.cur_weight, reps, is_warmup: false, input_mode: ui.filled ? 'batch' : 'tap', feel: null, at: new Date().toISOString() };
+      const set = { set_number: it.sets.length + 1, weight: E.dispToKg(E.kgToDisp(it.cur_weight, 2)), reps, is_warmup: false, input_mode: ui.filled ? 'batch' : 'tap', feel: null, at: new Date().toISOString() };
       const prev = it.sets.filter((s) => !s.is_warmup).pop();
       ui.msg = '';
       if (!set.is_warmup && prev && prev.reps > 0 && reps <= prev.reps * 0.6) ui.msg = '직전 세트보다 40% 넘게 줄었어요. 여기서 마무리해도 좋아요.';
@@ -960,9 +1108,8 @@
     'set-save'(ds) {
       const it = cur();
       const s = it.sets[Number(ds.i)];
-      const d = def(it);
-      const w = document.getElementById('fW').value;
-      s.weight = E.round(Number(w));
+      const w = fieldKg('fW');
+      if (w != null && isFinite(w)) s.weight = w;
       s.reps = Math.max(0, parseInt(document.getElementById('fR').value, 10) || 0);
       s.is_warmup = document.getElementById('fWu').checked;
       s.feel = document.getElementById('fF').value || null;
@@ -1012,7 +1159,7 @@
       toast('설정을 저장했어요');
     },
     export() {
-      const data = { version: 1, exported_at: new Date().toISOString(), settings: S.settings, sessions: S.sessions };
+      const data = { version: 2, exported_at: new Date().toISOString(), settings: S.settings, prefs: S.prefs, sessions: S.sessions };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -1026,7 +1173,8 @@
     wipe() {
       if (!confirm('세션 기록·진행 중 세션·설정을 모두 지울까요? 되돌릴 수 없어요.')) return;
       if (!confirm('정말 지울까요? 먼저 내보내기를 해 두는 것을 권해요.')) return;
-      S = { sessions: [], draft: null, settings: { bodyweight_kg: null, sound: true, target_min: 35 } };
+      S = { kg_v: 2, sessions: [], draft: null, settings: { bodyweight_kg: null, sound: true, target_min: 35, weight_unit: 'kg' }, prefs: {} };
+      E.setUnit('kg');
       save();
       closeSheet();
     },
@@ -1044,12 +1192,15 @@
       if (Array.isArray(data)) list = data;
       else if (data && Array.isArray(data.sessions)) list = data.sessions;
       else if (data && data.date && Array.isArray(data.exercises)) list = [data];
-      list = list.filter((s) => s && typeof s.date === 'string' && Array.isArray(s.exercises));
-      if (!list.length) return toast('가져올 세션이 없어요');
+      list = normalizeSessions(list.filter((s) => s && typeof s.date === 'string' && Array.isArray(s.exercises)));
+      const prefs = data && !Array.isArray(data) ? cleanPrefs(data.prefs) : {};
+      const nPrefs = Object.keys(prefs).length;
+      if (!list.length && !nPrefs) return toast('가져올 세션이 없어요');
       const key = (s) => s.date + '|' + s.session_type;
       const existing = new Set(S.sessions.map(key));
       const dup = list.filter((s) => existing.has(key(s))).length;
-      if (!confirm('세션 ' + list.length + '개를 가져올까요?' + (dup ? ' 같은 날짜·종류 ' + dup + '개는 덮어씁니다.' : ''))) return;
+      if (!confirm('세션 ' + list.length + '개' + (nPrefs ? '와 운동 설정 ' + nPrefs + '개' : '') + '를 가져올까요?' + (dup ? ' 같은 날짜·종류 ' + dup + '개는 덮어씁니다.' : ''))) return;
+      Object.assign(S.prefs, prefs);
       const incoming = new Set(list.map(key));
       S.sessions = S.sessions.filter((s) => !incoming.has(key(s))).concat(list);
       S.sessions.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
@@ -1077,7 +1228,7 @@
 
   if (S.draft) {
     S.draft.items = S.draft.items.filter((x) => C[x.exercise_type]).map((x) => {
-      if (C[x.exercise_type].unit === 'min' || typeof x.cur_weight === 'number') return x;
+      if (C[x.exercise_type].unit === 'min' || 'cur_weight' in x) return x;
       const fresh = retarget(x, x.exercise_type);
       fresh.sets = x.sets.filter((s) => typeof s.weight === 'number');
       return fresh;
@@ -1092,7 +1243,9 @@
     ui.phase = c.sets.length || S.draft.items.some((x) => x.sets.length) ? 'rest' : 'input';
     ui.timer.total = c.target.rest_sec || 0;
     ui.timer.remaining = ui.timer.total;
+    ui.askWeight = unmeasured(c) && !c.sets.length;
     keepAwake();
   }
+  save();
   render();
 })();
