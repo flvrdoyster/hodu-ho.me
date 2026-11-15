@@ -154,6 +154,21 @@ window.CATALOG = {
     load: 'none', measure: 'seconds', default_duration_sec: 900,
     default_sets: 1, rest_sec: 0, progression: 'none', difficulty: 1,
   },
+  running: {
+    name: '러닝', pattern: 'cardio', equipment: 'outdoor',
+    load: 'none', measure: 'seconds', default_duration_sec: 1200,
+    default_sets: 1, rest_sec: 0, progression: 'none', difficulty: 1,
+  },
+  treadmill: {
+    name: '트레드밀', pattern: 'cardio', equipment: 'treadmill',
+    load: 'none', measure: 'seconds', default_duration_sec: 900,
+    default_sets: 1, rest_sec: 0, progression: 'none', difficulty: 1,
+  },
+  stair_climber: {
+    name: '천국의 계단', pattern: 'cardio', equipment: 'stair_climber_machine',
+    load: 'none', measure: 'seconds', default_duration_sec: 600,
+    default_sets: 1, rest_sec: 0, progression: 'none', difficulty: 1,
+  },
 };
 
 window.TEMPLATES = {
@@ -166,7 +181,7 @@ window.TEMPLATES = {
       { priority: 'main', default: 'cable_pushdown', alts: ['assisted_dip'] },
       { priority: 'main', default: 'reverse_pec_deck', alts: ['lateral_raise_machine', 'cable_lateral_raise'] },
       { priority: 'optional', balance: ['dumbbell_shoulder_press', 'dumbbell_curl'] },
-      { priority: 'optional', default: 'stationary_bike', alts: [] },
+      { priority: 'optional', default: 'stationary_bike', alts: ['running', 'treadmill', 'stair_climber'], recent: true },
     ],
   },
   lower: {
@@ -176,7 +191,7 @@ window.TEMPLATES = {
       { priority: 'core', default: 'leg_press', alts: ['squat', 'hack_squat'] },
       { priority: 'main', default: 'leg_curl', alts: [] },
       { priority: 'main', default: 'leg_extension', alts: ['split_squat', 'walking_lunge'] },
-      { priority: 'optional', default: 'stationary_bike', alts: [] },
+      { priority: 'optional', default: 'stationary_bike', alts: ['running', 'treadmill', 'stair_climber'], recent: true },
     ],
   },
 };

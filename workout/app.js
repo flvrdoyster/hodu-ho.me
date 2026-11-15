@@ -3,6 +3,9 @@
   const E = window.Engine;
   const Dt = window.Data;
   const LOCK_MS = 400;
+  const TIME_MIN = 10;
+  const TIME_MAX = 60;
+  const TIME_STEP = 5;
   const KEY = 'workout_v1';
   const DRAFT_KEY = 'workout_v1_draft';
   const BACKUP_KEY = 'workout_v1_pre3';
@@ -382,8 +385,9 @@
     clearInterval(g.timer);
     if (g.to !== g.from) {
       const list = items();
-      const moved = list.splice(g.from, 1)[0];
-      list.splice(g.to, 0, moved);
+      const moved = list.splice(idxOf(g.rows[g.from].dataset.uid), 1)[0];
+      const at = idxOf(g.rows[g.to].dataset.uid);
+      list.splice(g.to > g.from ? at + 1 : at, 0, moved);
       save();
     }
     render();
@@ -394,7 +398,7 @@
     if (!h || drag) return;
     e.preventDefault();
     const li = h.closest('.row');
-    const rows = Array.from(li.parentNode.children);
+    const rows = Array.from(li.parentNode.children).filter((el) => el.classList.contains('row'));
     const from = rows.indexOf(li);
     drag = {
       li, rows, from, to: from,
@@ -482,10 +486,10 @@
       right += (right ? ' ' : '') + '›';
     }
     const act = mode === 'list' && !off ? 'jump' : 'row-sheet';
-    return '<li class="row xr' + (off ? ' off' : '') + (isCur ? ' cur' : '') + '"' + (isCur ? ' id="curRow"' : '') + '>' +
+    return '<li class="row xr' + (off ? ' off' : '') + (isCur ? ' cur' : '') + '" data-uid="' + it.uid + '"' + (isCur ? ' id="curRow"' : '') + '>' +
       '<button type="button" class="xr__b" data-act="' + act + '" data-uid="' + it.uid + '"><span class="xr__m"><span class="xr__n">' + esc(d.name) + tags + '</span>' +
       '<span class="xr__s">' + esc(sub) + '</span></span>' + (right ? '<span class="xr__r">' + right + '</span>' : '') + '</button>' +
-      (mode === 'edit' ? '<button type="button" class="row__handle" aria-label="끌어서 순서 바꾸기">≡</button>' : '') + '</li>';
+      (mode === 'edit' || mode === 'plan' ? '<button type="button" class="row__handle" aria-label="끌어서 순서 바꾸기">≡</button>' : '') + '</li>';
   }
 
   const isCut = (it) => it.auto && it.status === 'skipped';
@@ -521,16 +525,14 @@
   }
 
   function planHTML() {
-    const editing = ui.editing;
     const planned = Math.round(items().filter(strength).reduce((a, it) => a + planSec(it), 0) / 60);
     return '<div class="screen">' + topbar({ title: tplName(D().session_type) + ' 세션 · ' + D().date, right: textBtn('plan-cancel', '취소') }) +
-      '<div class="tm">' + hx('<button type="button" class="rnd rnd--sm" data-act="time" data-dir="-1" aria-label="운동 시간 줄이기">−</button>') +
+      '<div class="tm">' + hx('<button type="button" class="rnd rnd--sm" data-act="time" data-dir="-1" aria-label="운동 시간 줄이기"' + (targetMin() <= TIME_MIN ? ' disabled' : '') + '>−</button>') +
       '<div class="tm__c"><span class="lbl">운동 시간</span><button type="button" class="tm__v" data-act="time-edit"><b>' + targetMin() + '</b><u>분</u></button>' +
       '<p class="tm__s">근력 예상 ' + planned + '분</p></div>' +
-      hx('<button type="button" class="rnd rnd--sm" data-act="time" data-dir="1" aria-label="운동 시간 늘리기">+</button>') + '</div>' +
-      sbarHTML() + lastSessionHTML() + rowsHTML(editing ? 'edit' : 'plan') +
-      '<div class="dock"><div class="quiet"><button type="button" data-act="add">운동 추가</button>' +
-      '<button type="button" data-act="list-edit">' + (editing ? '순서 완료' : '순서 바꾸기') + '</button></div>' +
+      hx('<button type="button" class="rnd rnd--sm" data-act="time" data-dir="1" aria-label="운동 시간 늘리기"' + (targetMin() >= TIME_MAX ? ' disabled' : '') + '>+</button>') + '</div>' +
+      sbarHTML() + lastSessionHTML() + rowsHTML('plan') +
+      '<div class="dock"><div class="quiet"><button type="button" data-act="add">운동 추가</button></div>' +
       hx('<button type="button" class="cta" data-act="plan-start">시작</button>') + '</div></div>';
   }
 
@@ -1005,8 +1007,10 @@
     window.scrollTo(0, 0);
   }
 
+  const clampMin = (min) => Math.max(TIME_MIN, Math.min(TIME_MAX, min));
+
   function setTime(min) {
-    D().target_sec = Math.max(10, Math.min(120, min)) * 60;
+    D().target_sec = clampMin(min) * 60;
     S.settings.target_sec = D().target_sec;
     fitToTime(true);
     save(true);
@@ -1050,11 +1054,13 @@
       if (!confirm('이번 세션 기록을 모두 버리고 첫 화면으로 갈까요?')) return;
       dropDraft();
     },
-    time(ds) { setTime(targetMin() + 5 * Number(ds.dir)); },
+    time(ds) { setTime(targetMin() + TIME_STEP * Number(ds.dir)); },
     'time-edit'() {
       const v = prompt('운동 시간 (분)', targetMin());
       if (v == null || v.trim() === '' || isNaN(Number(v))) return;
-      setTime(Math.round(Number(v)));
+      const want = Math.round(Number(v));
+      setTime(want);
+      if (want !== clampMin(want)) toast('운동 시간을 ' + clampMin(want) + '분으로 맞췄어요');
     },
     'plan-start'() {
       const first = items().find((x) => x.status === 'pending');
@@ -1381,6 +1387,17 @@
   document.addEventListener('click', dispatch);
   document.addEventListener('change', dispatch);
 
+  function fitStoredTime() {
+    const fit = (sec) => (typeof sec === 'number' && isFinite(sec) ? clampMin(Math.round(sec / 60)) * 60 : sec);
+    S.settings.target_sec = fit(S.settings.target_sec);
+    if (S.draft && S.draft.target_sec != null) {
+      const was = S.draft.target_sec;
+      S.draft.target_sec = fit(was);
+      if (S.draft.target_sec !== was && S.draft.phase === 'plan') fitToTime(true);
+    }
+  }
+
+  fitStoredTime();
   endIfIdle();
   if (S.draft && S.draft.phase === 'active') {
     const it = cur();

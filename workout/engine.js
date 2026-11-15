@@ -192,6 +192,16 @@
     return best;
   }
 
+  function mostRecent(sessions, ids) {
+    let best = null;
+    let bestDate = '';
+    ids.forEach((id) => {
+      const h = history(sessions, id);
+      if (h.length && h[0].date > bestDate) { best = id; bestDate = h[0].date; }
+    });
+    return best;
+  }
+
   function setsInDays(sessions, pattern, today, days) {
     const from = new Date(today + 'T00:00:00');
     from.setDate(from.getDate() - days);
@@ -244,13 +254,16 @@
         const k = counts.indexOf(Math.min(...counts));
         id = list[k];
         pre = '최근 7일 ' + PATTERN_NAME[get(id).pattern] + ' ' + counts[k] + '세트 · ';
+      } else if (slot.recent) {
+        const all = candidates(slot);
+        id = mostRecent(sessions, all) || slot.default;
       } else {
         const all = candidates(slot);
         const pool = all.filter((x) => used.indexOf(x) < 0);
         const known = pool.filter((x) => history(sessions, x).length > 0);
         const from = pool.length ? (fresh ? (known.length ? known : pool) : pool) : all;
         id = leastRecent(sessions, from) || slot.default;
-        if (!history(sessions, id).length && all.length > 1) fresh++;
+        if (!history(sessions, id).length && all.length > 1 && !isTimed(get(id))) fresh++;
       }
       used.push(id);
       const r = recommend(id, sessions, increments);
