@@ -263,16 +263,9 @@
     return t.running ? Math.max(0, Math.ceil((t.endsAt - Date.now()) / 1000)) : t.remaining;
   }
 
-  const elapsedText = () => Math.floor(elapsedSec() / 60) + '/' + targetMin() + '분';
-
   const mmss = (s) => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 
   setInterval(() => {
-    const clock = document.getElementById('elapsed');
-    if (clock && S.draft) {
-      clock.textContent = elapsedText();
-      clock.classList.toggle('is-over', timeUp());
-    }
     const tick = document.getElementById('bandTick');
     if (tick && S.draft) {
       tick.style.left = Math.min(100, elapsedSec() / Number(tick.dataset.scale) * 100) + '%';
@@ -397,8 +390,8 @@
   document.addEventListener('pointerup', dragEnd);
   document.addEventListener('pointercancel', dragEnd);
 
-  function topbar(title, sub, right) {
-    return '<header class="topbar"><div class="topbar__title"><h1>' + esc(title) + '</h1>' + (sub ? '<p class="topbar__sub">' + esc(sub) + '</p>' : '') + '</div>' + (right || '') + '</header>';
+  function topbar(title, sub, right, left, sticky) {
+    return '<header class="topbar' + (sticky ? ' topbar--sticky' : '') + '">' + (left || '') + '<div class="topbar__title"><h1>' + esc(title) + '</h1>' + (sub ? '<p class="topbar__sub">' + esc(sub) + '</p>' : '') + '</div>' + (right || '') + '</header>';
   }
 
   const settingsBtn = '<button type="button" class="btn btn--ghost btn--sm" data-act="settings">설정</button>';
@@ -431,7 +424,7 @@
       const jumpable = mode === 'list' && it.status !== 'skipped';
       const main = '<span class="row__name">' + esc(d.name) + (unmeasured(it) ? '<span class="tag">미측정</span>' : '') + status + '</span>' +
         '<span class="row__sub">' + esc(sub) + '</span>' +
-        (mode === 'plan' && it.status !== 'skipped' ? '<span class="row__reason">' + esc((it.pre || '') + E.recommend(it.exercise_type, S.sessions, S.prefs).reason) + '</span>' : '');
+        (mode === 'plan' && it.status !== 'skipped' && !unmeasured(it) ? '<span class="row__reason">' + esc((it.pre || '') + E.recommend(it.exercise_type, S.sessions, S.prefs).reason) + '</span>' : '');
       return '<li class="row' + (it.status === 'skipped' ? ' is-skipped' : '') + (isCur ? ' is-current' : '') + '"' + (isCur ? ' id="curRow"' : '') + '>' +
         (jumpable
           ? '<button type="button" class="row__main row__main--btn" data-act="jump" data-uid="' + it.uid + '"><span class="row__text">' + main + '</span><span aria-hidden="true">›</span></button>'
@@ -439,7 +432,7 @@
         (mode === 'list' ? '</li>' : '<div class="row__tools">' +
         '<button type="button" class="btn btn--sm" data-act="swap" data-uid="' + it.uid + '">대체</button>' +
         '<button type="button" class="btn btn--sm" data-act="skip" data-uid="' + it.uid + '">' + (it.status === 'skipped' ? '복원' : '생략') + '</button>' +
-        '<button type="button" class="btn btn--icon row__handle" aria-label="끌어서 순서 바꾸기">≡</button>' +
+        '<button type="button" class="btn btn--sm row__handle" aria-label="끌어서 순서 바꾸기">≡</button>' +
         '</div></li>');
     }).join('') + '</ol>';
   }
@@ -460,10 +453,9 @@
     const editing = ui.editing;
     const done = items().filter((x) => x.status === 'done').length;
     const active = items().filter((x) => x.status !== 'skipped').length;
-    return '<header class="topbar topbar--fixed">' +
-      '<button type="button" class="btn btn--ghost btn--sm topbar__back" data-act="back-ex">‹ 운동으로</button>' +
-      '<h1 class="topbar__title topbar__title--one">세션 목록 <span class="topbar__sub">' + done + '/' + active + ' 완료</span></h1>' +
-      '<button type="button" class="btn btn--ghost btn--sm" data-act="list-edit">' + (editing ? '완료' : '편집') + '</button></header>' +
+    return topbar('세션 목록', done + '/' + active + ' 완료',
+      '<button type="button" class="btn btn--ghost btn--sm" data-act="list-edit">' + (editing ? '완료' : '편집') + '</button>',
+      '<button type="button" class="btn btn--ghost btn--sm topbar__back" data-act="back-ex">‹ 운동으로</button>', true) +
       '<section class="stack">' + timeCardHTML() + rowsHTML(editing ? 'edit' : 'list') +
       '<button type="button" class="btn" data-act="add">운동 추가</button>' +
       '<button type="button" class="btn" data-act="finish">세션 종료</button>' +
@@ -480,20 +472,15 @@
   function exerciseHTML() {
     const it = cur();
     const d = def(it);
-    const active = items().filter((x) => x.status !== 'skipped');
-    const pos = active.findIndex((x) => x.uid === it.uid) + 1;
     const nx = nextPending(it.uid);
 
-    const progress = '<button type="button" class="progress" data-act="open-list"><span class="progress__row">' +
-      '<span class="progress__count">운동 ' + pos + '/' + active.length + '</span>' +
-      '<span class="progress__next">' + (nx ? '다음 ' + esc(def(nx).name) : '마지막 운동') + '</span>' +
-      '<span class="progress__time' + (timeUp() ? ' is-over' : '') + '" id="elapsed">' + elapsedText() + '</span><span aria-hidden="true">›</span></span>' + bandHTML() + '</button>';
+    const progress = '<div class="progress">' + bandHTML() + '<button type="button" class="btn btn--ghost btn--sm" data-act="open-list">목록</button></div>';
 
     const card = '<div class="card ex"><h2>' + esc(d.name) + '</h2>' + targetsHTML(it, d) + '</div>';
 
     const panel = ui.phase === 'rest' ? restHTML(it, nx) : inputHTML(it);
-    const memo = ui.phase === 'rest' ? '<button type="button" class="set set--memo" data-act="note-edit"><span class="set__n">메모</span>' +
-      '<span class="set__note">' + (it.note ? esc(it.note) : '오늘 메모 추가') + '</span><span aria-hidden="true">›</span></button>' : '';
+    const memo = ui.phase === 'rest' ? '<button type="button" class="memo-row" data-act="note-edit"><span class="memo-row__n">메모</span>' +
+      '<span class="memo-row__t">' + (it.note ? esc(it.note) : '오늘 메모 추가') + '</span><span aria-hidden="true">›</span></button>' : '';
     const sets = setsHTML(it);
     const log = sets || memo ? '<div class="card ex-log">' + sets + memo + '</div>' : '';
     return '<section class="stack stack--ex">' + progress + card + panel + log + lastMemoHTML(it) + prevHTML(it) + '</section>';
