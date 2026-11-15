@@ -71,6 +71,7 @@
   --z-toast: 10;
 
   --press: 0.98;
+  --hx-opacity: 0.02;
   --disabled: 0.4;
 
   color-scheme: light dark;
@@ -170,6 +171,27 @@ strong { font-weight: var(--fw-bold); }
 .btn--ghost { background: transparent; border-color: transparent; color: var(--accent); }
 .btn--danger { color: var(--danger); }
 .btn--icon { min-width: var(--h-touch); padding: 0; font-size: var(--fs-icon); }
+.hx { position: relative; display: flex; }
+.hx > .btn, .hx > .counter { flex: 1; }
+.hx__sw {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 100%;
+  min-width: var(--h-touch);
+  min-height: var(--h-touch);
+  transform: translate(-50%, -50%);
+  margin: 0;
+  opacity: var(--hx-opacity);
+  z-index: var(--z-lift);
+  outline: none;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
 
 .btn--sm, .set, .memo-row, .check, .prev-wrap summary { position: relative; }
 .btn--sm::after, .set::after, .memo-row::after, .check::after, .prev-wrap summary::after {
@@ -184,7 +206,7 @@ strong { font-weight: var(--fw-bold); }
   transform: translate(-50%, -50%);
 }
 
-.btn:active, .set:active, .memo-row:active, .pick:active, .counter:active, .stepper__val:active, .row__main--btn:active { transform: scale(var(--press)); }
+.hx:active > .btn, .hx:active > .counter, .btn:active, .set:active, .memo-row:active, .pick:active, .counter:active, .stepper__val:active, .row__main--btn:active { transform: scale(var(--press)); }
 
 .tag {
   display: inline-block;
@@ -427,7 +449,7 @@ textarea.input { resize: vertical; }
 
 @media (prefers-reduced-motion: reduce) {
   .stage--over2 .count__n { animation: none; }
-  .btn:active, .set:active, .memo-row:active, .pick:active, .counter:active, .stepper__val:active, .row__main--btn:active { transform: none; }
+  .hx:active > .btn, .hx:active > .counter, .btn:active, .set:active, .memo-row:active, .pick:active, .counter:active, .stepper__val:active, .row__main--btn:active { transform: none; }
   .timer__bar { transition: none; }
   .row.is-shifting { transition: none; }
 }

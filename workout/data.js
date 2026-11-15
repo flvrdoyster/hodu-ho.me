@@ -11,7 +11,7 @@
   const newId = () => Math.random().toString(36).slice(2, 9);
 
   function defaultSettings() {
-    return { bodyweight_kg: null, sound: true, target_sec: 2100, weight_unit: 'kg' };
+    return { bodyweight_kg: null, sound: true, haptic: true, target_sec: 2100, weight_unit: 'kg' };
   }
 
   function emptyStore() {
@@ -168,6 +168,7 @@
     const out = {};
     if (!isObj(st)) return out;
     if (typeof st.sound === 'boolean') out.sound = st.sound;
+    if (typeof st.haptic === 'boolean') out.haptic = st.haptic;
     if (st.weight_unit === 'kg' || st.weight_unit === 'lbs') out.weight_unit = st.weight_unit;
     const sec = isNum(st.target_sec) ? st.target_sec : (isNum(st.target_min) ? st.target_min * 60 : null);
     if (sec != null && sec >= 600 && sec <= 7200) out.target_sec = Math.round(sec);

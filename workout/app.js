@@ -234,8 +234,14 @@
         o.stop(actx.currentTime + t + 0.2);
       });
     }
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    if (S.settings.haptic && navigator.vibrate) navigator.vibrate([200, 100, 200]);
   }
+
+  const hxSwitch = !('vibrate' in navigator);
+  const hx = (html) => {
+    if (!S.settings.haptic || /\sdisabled[\s>]/.test(html)) return html;
+    return '<span class="hx">' + html + (hxSwitch ? '<input class="hx__sw" type="checkbox" switch aria-hidden="true" tabindex="-1">' : '') + '</span>';
+  };
 
   function startTimer(sec) {
     const t = ui.timer;
@@ -443,7 +449,7 @@
     return topbar({ title: '세션 목록', left: textBtn('back-ex', '‹ 운동으로'), right: textBtn('list-edit', editing ? '완료' : '편집') }) +
       '<section class="stack">' + timeCardHTML() + rowsHTML(editing ? 'edit' : 'list') +
       '<button type="button" class="btn" data-act="add">운동 추가</button>' +
-      '<button type="button" class="btn" data-act="finish">세션 종료</button>' +
+      hx('<button type="button" class="btn" data-act="finish">세션 종료</button>') +
       '<button type="button" class="btn btn--danger" data-act="abandon">기록 버리고 처음으로</button></section>';
   }
 
@@ -451,7 +457,7 @@
     return topbar({ title: tplName(D().session_type) + ' 세션', right: textBtn('plan-cancel', '취소') }) +
       '<section class="stack stack--lead"><p class="lead">' + esc(D().date) + '</p>' + timeCardHTML() + lastSessionHTML() + rowsHTML('plan') +
       '<button type="button" class="btn" data-act="add">운동 추가</button>' +
-      '<button type="button" class="btn btn--primary btn--lg" data-act="plan-start">시작</button></section>';
+      hx('<button type="button" class="btn btn--primary btn--lg" data-act="plan-start">시작</button>') + '</section>';
   }
 
   function exerciseHTML() {
@@ -472,13 +478,13 @@
   function stepper(label, act, val, note, off, extra) {
     const dis = off ? ' disabled' : '';
     return '<div class="tgt tgt--wide"><div class="head-row"><span class="label">' + label + '</span>' + (extra || '') + '</div>' +
-      '<div class="stepper"><button type="button" class="btn btn--icon" data-act="' + act + '" data-dir="-1" aria-label="' + label + ' 줄이기"' + dis + '>−</button>' +
+      '<div class="stepper">' + hx('<button type="button" class="btn btn--icon" data-act="' + act + '" data-dir="-1" aria-label="' + label + ' 줄이기"' + dis + '>−</button>') +
       '<button type="button" class="stepper__val" data-act="' + act + '-edit">' + esc(val) + '</button>' +
-      '<button type="button" class="btn btn--icon" data-act="' + act + '" data-dir="1" aria-label="' + label + ' 늘리기"' + dis + '>+</button></div>' +
+      hx('<button type="button" class="btn btn--icon" data-act="' + act + '" data-dir="1" aria-label="' + label + ' 늘리기"' + dis + '>+</button>') + '</div>' +
       (note ? '<span class="muted small">' + esc(note) + '</span>' : '') + '</div>';
   }
 
-  const unitBtn = () => '<button type="button" class="btn btn--sm" data-act="unit-toggle" aria-label="무게 단위 바꾸기">' + S.settings.weight_unit + '</button>';
+  const unitBtn = () => hx('<button type="button" class="btn btn--sm" data-act="unit-toggle" aria-label="무게 단위 바꾸기">' + S.settings.weight_unit + '</button>');
 
   function targetsHTML(it, d) {
     const cell = (label, val) => '<div class="tgt"><span class="label">' + label + '</span><span class="tgt__v">' + esc(val) + '</span></div>';
@@ -530,24 +536,24 @@
   function inputHTML(it) {
     if (isTimed(it)) {
       return '<div class="panel panel--input">' +
-        '<button type="button" class="btn btn--primary btn--lg" data-act="cardio-done">' + (it.sets.length ? '시간 다시 기록' : '기록') + '</button>' +
+        hx('<button type="button" class="btn btn--primary btn--lg" data-act="cardio-done">' + (it.sets.length ? '시간 다시 기록' : '기록') + '</button>') +
         navHTML(it, nextPending(it.uid)) + '</div>';
     }
     const target = it.target.reps;
-    const counter = '<button type="button" class="counter stage--' + E.stage(ui.reps, target) + '" data-act="tap-full">' +
-      '<span class="count__n">' + ui.reps + '</span><span class="count__t">눌러서 +1 · 목표 ' + target + '회</span></button>' +
-      '<div class="row2"><button type="button" class="btn" data-act="tap-undo"' + (undoStack.length ? '' : ' disabled') + '>되돌리기</button>' +
-      '<button type="button" class="btn" data-act="tap-fill"' + (target ? '' : ' disabled') + '>+' + target + '</button></div>';
+    const counter = hx('<button type="button" class="counter stage--' + E.stage(ui.reps, target) + '" data-act="tap-full">' +
+      '<span class="count__n">' + ui.reps + '</span><span class="count__t">눌러서 +1 · 목표 ' + target + '회</span></button>') +
+      '<div class="row2">' + hx('<button type="button" class="btn" data-act="tap-undo"' + (undoStack.length ? '' : ' disabled') + '>되돌리기</button>') +
+      hx('<button type="button" class="btn" data-act="tap-fill"' + (target ? '' : ' disabled') + '>+' + target + '</button>') + '</div>';
     return '<div class="panel panel--input">' + counter +
-      '<button type="button" class="btn btn--primary btn--lg" data-act="record">' + (workDone(it) + 1) + '세트 기록</button></div>';
+      hx('<button type="button" class="btn btn--primary btn--lg" data-act="record">' + (workDone(it) + 1) + '세트 기록</button>') + '</div>';
   }
 
   function navHTML(it, nx, quiet) {
     const done = !quiet && (isTimed(it) ? it.sets.length > 0 : workDone(it) >= it.target.sets);
     if (!nx) {
-      return '<button type="button" class="btn' + (done ? ' btn--primary btn--lg' : '') + '" data-act="finish">세션 종료</button>';
+      return hx('<button type="button" class="btn' + (done ? ' btn--primary btn--lg' : '') + '" data-act="finish">세션 종료</button>');
     }
-    return '<button type="button" class="btn' + (done ? ' btn--primary btn--lg' : '') + '" data-act="next-ex">다음 운동으로 · ' + esc(def(nx).name) + '</button>';
+    return hx('<button type="button" class="btn' + (done ? ' btn--primary btn--lg' : '') + '" data-act="next-ex">다음 운동으로 · ' + esc(def(nx).name) + '</button>');
   }
 
   function restHTML(it, nx) {
@@ -556,21 +562,21 @@
     let feel = '';
     if (ui.feelIdx != null && it.sets[ui.feelIdx]) {
       feel = '<div class="feel"><p class="label">방금 세트 어땠어요?</p><div class="row3">' +
-        Object.keys(FEEL).map((k) => '<button type="button" class="btn" data-act="feel" data-v="' + k + '">' + FEEL[k] + '</button>').join('') +
+        Object.keys(FEEL).map((k) => hx('<button type="button" class="btn" data-act="feel" data-v="' + k + '">' + FEEL[k] + '</button>')).join('') +
         '</div></div>';
     }
     const up = timeUp();
     const done = up || workDone(it) >= it.target.sets;
-    const nextSet = '<button type="button" class="btn' + (done ? '' : ' btn--primary btn--lg') + '" data-act="next-set">' + (done ? '한 세트 더' : '다음 세트 시작') + '</button>';
+    const nextSet = hx('<button type="button" class="btn' + (done ? '' : ' btn--primary btn--lg') + '" data-act="next-set">' + (done ? '한 세트 더' : '다음 세트 시작') + '</button>');
     return '<div class="panel panel--rest">' + feel +
       (up ? '<p class="note">운동 시간 ' + targetMin() + '분이 됐어요.</p>' : '') +
       (ui.msg ? '<p class="note">' + esc(ui.msg) + '</p>' : '') +
       '<div class="timer"><span class="label">휴식</span><span class="timer__t" id="timerText">' + mmss(left) + '</span>' +
       '<div class="timer__track"><div class="timer__bar" id="timerBar" style="transform:scaleX(' + (t.total ? left / t.total : 0) + ')"></div></div></div>' +
-      '<div class="row3"><button type="button" class="btn" data-act="t-toggle">' + (t.running ? '일시정지' : '시작') + '</button>' +
-      '<button type="button" class="btn" data-act="t-reset">리셋</button>' +
-      '<button type="button" class="btn" data-act="t-add">+30초</button></div>' +
-      (up ? '<button type="button" class="btn btn--primary btn--lg" data-act="finish">세션 종료</button>' : '') +
+      '<div class="row3">' + hx('<button type="button" class="btn" data-act="t-toggle">' + (t.running ? '일시정지' : '시작') + '</button>') +
+      hx('<button type="button" class="btn" data-act="t-reset">리셋</button>') +
+      hx('<button type="button" class="btn" data-act="t-add">+30초</button>') + '</div>' +
+      (up ? hx('<button type="button" class="btn btn--primary btn--lg" data-act="finish">세션 종료</button>') : '') +
       (isTimed(it) ? '' : nextSet) + (up && !nx ? '' : navHTML(it, nx, up)) + '</div>';
   }
 
@@ -795,6 +801,7 @@
     return '<div class="stack-sm">' +
       '<label class="field"><span class="label">체중 (kg)</span><input class="input" id="sBw" type="number" inputmode="decimal" step="0.1" value="' + esc(st.bodyweight_kg == null ? '' : st.bodyweight_kg) + '"></label>' +
       '<label class="check"><input type="checkbox" id="sSound"' + (st.sound ? ' checked' : '') + '> 휴식 끝 소리</label>' +
+      '<label class="check"><input type="checkbox" id="sHaptic"' + (st.haptic ? ' checked' : '') + '> 햅틱</label>' +
       '<button type="button" class="btn btn--primary" data-act="settings-save">설정 저장</button>' +
       '<hr><p class="muted small">저장된 세션 ' + S.sessions.length + '개' + (last ? ' · 최근 ' + esc(last.date) : '') + '</p>' +
       '<button type="button" class="btn" data-act="export">기록 내보내기 (JSON)</button>' +
@@ -1106,6 +1113,7 @@
       const bw = document.getElementById('sBw').value;
       S.settings.bodyweight_kg = bw === '' ? null : Number(bw);
       S.settings.sound = document.getElementById('sSound').checked;
+      S.settings.haptic = document.getElementById('sHaptic').checked;
       save(true);
       closeSheet();
       toast('설정을 저장했어요');
@@ -1166,10 +1174,16 @@
   });
 
   function dispatch(e) {
-    const el = e.target.closest('[data-act]');
+    let el = e.target.closest('[data-act]');
+    const viaSwitch = e.type === 'change' && e.target.matches('.hx__sw');
+    if (viaSwitch) {
+      e.target.checked = false;
+      el = e.target.previousElementSibling;
+    }
     if (!el || el.disabled) return;
+    if (e.type === 'click' && !hxSwitch && el.parentNode.classList.contains('hx')) navigator.vibrate(15);
     const act = el.dataset.act;
-    if (e.type === 'change' && el.tagName !== 'SELECT') return;
+    if (e.type === 'change' && !viaSwitch && el.tagName !== 'SELECT') return;
     if (e.type === 'click' && el.tagName === 'SELECT') return;
     const fn = A[act];
     if (!fn) return;
