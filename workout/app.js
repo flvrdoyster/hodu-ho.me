@@ -2,6 +2,7 @@
   const get = (id) => window.Catalog.get(id);
   const E = window.Engine;
   const Dt = window.Data;
+  const LOCK_MS = 400;
   const KEY = 'workout_v1';
   const DRAFT_KEY = 'workout_v1_draft';
   const BACKUP_KEY = 'workout_v1_pre3';
@@ -17,7 +18,7 @@
   E.setUnit(S.settings.weight_unit);
   const ui = {
     screen: 'main', phase: 'input', msg: '',
-    reps: 0, editing: false, sheetKind: null, sheetArg: null,
+    reps: 0, editing: false, lockUntil: 0, sheetKind: null, sheetArg: null,
     timer: { running: false, endsAt: 0, remaining: 0, total: 0 },
   };
 
@@ -66,11 +67,18 @@
   const today = () => E.localDate(new Date());
   const uid = () => Math.random().toString(36).slice(2, 9);
 
+  function popToast(show) {
+    if (!toastEl.showPopover) return;
+    try { if (show) toastEl.showPopover(); else toastEl.hidePopover(); } catch (e) {}
+  }
+
   function toast(text) {
     toastEl.textContent = text;
     toastEl.hidden = false;
+    popToast(false);
+    popToast(true);
     clearTimeout(toast.t);
-    toast.t = setTimeout(() => { toastEl.hidden = true; }, 2400);
+    toast.t = setTimeout(() => { toastEl.hidden = true; popToast(false); }, 2400);
   }
 
   function makeItem(rec) {
@@ -622,10 +630,12 @@
     const enter = (mid) => '<div class="enter">' +
       hx('<button type="button" class="rnd" data-act="dur" data-dir="-1" aria-label="시간 줄이기">−</button>') + hx(mid) +
       hx('<button type="button" class="rnd" data-act="dur" data-dir="1" aria-label="시간 늘리기">+</button>') + '</div>';
-    return '<div class="stage"><div class="setno">시간 운동' + (it.priority === 'optional' ? tag('선택') : '') + (rec ? ' <em>기록함</em>' : '') + '</div>' +
+    const got = rec ? Math.round(it.sets[0].duration_sec / 60) : 0;
+    return '<div class="stage"><div class="setno">시간 운동' + (it.priority === 'optional' ? tag('선택') : '') + '</div>' +
+      (rec ? '<p class="rec"><b>기록 ' + got + '분</b>' + (got === min ? '' : ' · 아래 ' + min + '분으로 다시 기록하면 바뀌어요') + '</p>' : '') +
       '<button type="button" class="big big--t" data-act="dur-edit" aria-label="시간 직접 입력"><b>' + min + '</b><u>분</u></button>' + prevRowHTML(it) + '</div>' +
       '<div class="dock">' + (rec
-        ? enter('<button type="button" class="btn" data-act="cardio-done">' + min + '분으로 다시 기록</button>') + nav('cta')
+        ? enter('<button type="button" class="btn" data-act="cardio-done"' + (got === min ? ' disabled' : '') + '>' + min + '분으로 다시 기록</button>') + nav('cta')
         : nav('btn btn--plain') + enter('<button type="button" class="cta" data-act="cardio-done">' + min + '분 했어요</button>')) + '</div>';
   }
 
@@ -676,7 +686,7 @@
     dr.items.forEach((it) => {
       if (it.status === 'skipped' || !it.sets.length) return;
       const sets = E.isTimed(def(it))
-        ? [Object.assign({}, it.sets[0], { duration_sec: it.target.duration_sec })]
+        ? [Object.assign({}, it.sets[0])]
         : it.sets.map((s) => Object.assign({}, s));
       const ex = { exercise_id: it.exercise_id, sets };
       if (it.note) ex.note = it.note;
@@ -769,7 +779,7 @@
         return '<li class="sr off"><div class="sr__h"><b>' + esc(d.name) + '</b><span>' + (it.status === 'skipped' ? '생략' : '기록 없음') + '</span></div></li>';
       }
       let lines;
-      if (E.isTimed(d)) lines = E.fmtMin(it.target.duration_sec);
+      if (E.isTimed(d)) lines = E.fmtMin(it.sets[0].duration_sec);
       else lines = it.sets.map((s) => (s.is_warmup ? '웜업 ' : '') + setText(d, s)).join(', ');
       const rec = E.recommend(it.exercise_id, future, S.increments);
       const recText = E.isTimed(d) ? E.fmtMin(rec.duration_sec) : E.fmtW(d, rec.weight) + ' × ' + rec.reps + '회 × ' + rec.sets + '세트';
@@ -1011,6 +1021,16 @@
     ui.askWeight = unmeasured(it);
   }
 
+  function dropDraft() {
+    closeSheet();
+    S.draft = null;
+    ui.screen = 'main';
+    ui.editing = false;
+    ui.timer.running = false;
+    if (wakeLock) wakeLock.release();
+    save();
+  }
+
   const A = {
     'new-session'(ds) {
       const date = today();
@@ -1028,12 +1048,7 @@
     },
     abandon() {
       if (!confirm('이번 세션 기록을 모두 버리고 첫 화면으로 갈까요?')) return;
-      closeSheet();
-      S.draft = null;
-      ui.screen = 'main';
-      ui.timer.running = false;
-      if (wakeLock) wakeLock.release();
-      save();
+      dropDraft();
     },
     time(ds) { setTime(targetMin() + 5 * Number(ds.dir)); },
     'time-edit'() {
@@ -1122,8 +1137,8 @@
       if (needs && !(w > 0)) return toast('시작 무게를 입력해 주세요');
       if (Math.abs(inc - base.increment) > 1e-9) S.increments[id] = inc; else delete S.increments[id];
       items().forEach((i) => {
-        if (i.exercise_id !== id || i.sets.length || w == null) return;
-        if (needs || i.uid === it.uid) { i.target.weight_kg = w; i.goal_kg = w; }
+        if (i.exercise_id !== id || w == null) return;
+        if (i.uid === it.uid || (needs && !i.sets.length)) { i.target.weight_kg = w; i.goal_kg = w; }
       });
       save(true);
       closeSheet();
@@ -1214,6 +1229,11 @@
       save();
     },
     finish() {
+      if (!buildLog().exercises.length) {
+        if (!confirm('기록한 세트가 없어요. 세션을 지우고 첫 화면으로 갈까요?')) return;
+        dropDraft();
+        return toast('기록이 없어 진행 중이던 세션을 지웠어요');
+      }
       if (!confirm('세션을 끝내고 요약으로 갈까요?')) return;
       const it = cur();
       if (it && (it.sets.length)) it.status = 'done';
@@ -1331,6 +1351,12 @@
   };
 
 
+  function dockSig() {
+    const all = app.querySelectorAll('.dock .cta');
+    const b = all[all.length - 1];
+    return b ? b.dataset.act + '|' + (b.dataset.uid || '') : '';
+  }
+
   function dispatch(e) {
     let el = e.target.closest('[data-act]');
     const viaSwitch = e.type === 'change' && e.target.matches('.hx__sw');
@@ -1345,8 +1371,11 @@
     if (e.type === 'click' && el.tagName === 'SELECT') return;
     const fn = A[act];
     if (!fn) return;
+    if (Date.now() < ui.lockUntil && el.closest('.dock') && !el.classList.contains('rnd')) return;
+    const before = dockSig();
     fn(el.dataset, el);
     render();
+    if (dockSig() !== before) ui.lockUntil = Date.now() + LOCK_MS;
   }
 
   document.addEventListener('click', dispatch);
