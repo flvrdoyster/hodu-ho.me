@@ -14,6 +14,15 @@
   const sheet = document.getElementById('sheet');
   const toastEl = document.getElementById('toast');
 
+  function fitApp() {
+    const vv = window.visualViewport;
+    const h = vv ? vv.height * vv.scale : window.innerHeight;
+    document.documentElement.style.setProperty('--app-h', h + 'px');
+  }
+  fitApp();
+  window.addEventListener('resize', fitApp);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', fitApp);
+
   const FEEL = { light: '가벼움', ok: '적당', heavy: '무거움' };
   const STATUS = { pending: '대기', done: '완료', skipped: '생략' };
 
