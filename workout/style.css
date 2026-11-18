@@ -248,6 +248,8 @@ button.sbar__l { min-height: var(--h-touch); padding-left: var(--g); text-decora
 .tm__v u, .sum__v u { margin-left: var(--s2); font-size: var(--fs-lg); font-weight: var(--fw-medium); color: var(--ink-2); text-decoration: none; }
 .tm__s { margin-top: var(--s4); font-size: var(--fs-sm); color: var(--ink-2); }
 
+.over { flex: none; margin-top: var(--s6); padding: 0 var(--pad); font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--time); }
+.empty { display: flex; flex: 1; align-items: center; justify-content: center; padding: var(--s28) var(--pad); font-size: var(--fs-md); color: var(--ink-2); text-align: center; }
 .memo { flex: none; margin: var(--s12) var(--pad) 0; padding-left: var(--s12); border-left: var(--bw-strong) solid var(--line); font-size: var(--fs-sm); }
 .memo .lbl { display: block; font-size: var(--fs-xs); }
 

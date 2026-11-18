@@ -210,7 +210,10 @@
   const planSec = (it) => (it.target.sets + warmTotal(it)) * setSec(it);
   const segSec = (it) => (Math.max(it.target.sets, workDone(it)) + warmTotal(it)) * setSec(it);
 
+  const isFree = () => !!(window.TEMPLATES[D().session_type] && window.TEMPLATES[D().session_type].free);
+
   function fitToTime(rebuild) {
+    if (isFree()) return { cut: [], trimmed: [] };
     const open = (it) => strength(it) && !it.sets.length && it.uid !== D().current;
     if (rebuild) {
       items().forEach((it) => {
@@ -247,6 +250,11 @@
 
   const timeUp = () => D().phase === 'active' && elapsedSec() >= targetSec();
 
+  function overMin() {
+    if (!isFree() || D().phase === 'active') return 0;
+    return Math.round(items().filter(strength).reduce((a, it) => a + planSec(it), 0) / 60) - targetMin();
+  }
+
   function sbarHTML(edit) {
     const list = items().filter(strength);
     const planned = list.reduce((a, it) => a + segSec(it), 0);
@@ -260,7 +268,7 @@
     const free = scale - planned;
     const tick = run ? '<span class="sbar__n" id="bandTick" data-scale="' + scale + '" style="left:' + Math.min(100, elapsedSec() / scale * 100) + '%"></span>' : '';
     const text = (run ? Math.floor(elapsedSec() / 60) : Math.round(list.reduce((a, it) => a + planSec(it), 0) / 60)) + ' / ' + targetMin() + '분';
-    const over = timeUp() ? ' is-over' : '';
+    const over = timeUp() || (!run && overMin() > 0) ? ' is-over' : '';
     const label = edit
       ? '<button type="button" class="sbar__l' + over + '" id="sbarL" data-act="time-edit" aria-label="운동 시간 바꾸기">' + text + '</button>'
       : '<span class="sbar__l' + over + '" id="sbarL">' + text + '</span>';
@@ -497,7 +505,7 @@
   function shortReason(it) {
     const r = fullReason(it);
     const i = r.lastIndexOf('→');
-    return (i < 0 ? r : r.slice(i + 1)).trim();
+    return (i < 0 ? r : r.slice(i + 1)).trim().replace(/^무게 유지, /, '');
   }
 
   function rowHTML(it, mode) {
@@ -530,6 +538,7 @@
 
   function rowsHTML(mode) {
     const list = items();
+    if (!list.length) return '<p class="empty">운동을 추가해서 시작하세요</p>';
     if (mode === 'edit') return '<ol class="rows">' + list.map((it) => rowHTML(it, mode)).join('') + '</ol>';
     const cut = list.filter(isCut);
     return '<ol class="rows">' + list.filter((it) => !isCut(it)).map((it) => rowHTML(it, mode)).join('') +
@@ -566,9 +575,10 @@
       '<div class="tm__c"><span class="lbl">운동 시간</span><button type="button" class="tm__v" data-act="time-edit"><b>' + targetMin() + '</b><u>분</u></button>' +
       '<p class="tm__s">근력 예상 ' + planned + '분</p></div>' +
       hx('<button type="button" class="rnd rnd--sm" data-act="time" data-dir="1" aria-label="운동 시간 늘리기"' + (targetMin() >= TIME_MAX ? ' disabled' : '') + '>+</button>') + '</div>' +
-      sbarHTML() + lastSessionHTML() + rowsHTML('plan') +
-      '<div class="dock"><div class="quiet"><button type="button" data-act="add">운동 추가</button></div>' +
-      hx('<button type="button" class="cta" data-act="plan-start">시작</button>') + '</div></div>';
+      sbarHTML() + (overMin() > 0 ? '<p class="over">목표를 ' + overMin() + '분 넘었어요</p>' : '') + lastSessionHTML() + rowsHTML('plan') +
+      (items().length
+        ? '<div class="dock"><div class="quiet"><button type="button" data-act="add">운동 추가</button></div>' + hx('<button type="button" class="cta" data-act="plan-start">시작</button>') + '</div></div>'
+        : '<div class="dock">' + hx('<button type="button" class="cta" data-act="add">운동 추가</button>') + '</div></div>');
   }
 
   function exerciseHTML() {
@@ -614,7 +624,7 @@
     const same = S.sessions.filter((x) => x.session_type === D().session_type);
     const last = same[same.length - 1];
     const watch = last ? last.watch_note : null;
-    if (!last || (!last.notes && !watch)) return '';
+    if (isFree() || !last || (!last.notes && !watch)) return '';
     return '<div class="memo"><span class="lbl">지난 ' + esc(tplName(last.session_type)) + ' 세션 메모 · ' + esc(last.date) + '</span>' +
       (last.notes ? '<p>' + esc(last.notes) + '</p>' : '') +
       (watch ? '<p>지켜볼 것: ' + esc(watch) + '</p>' : '') + '</div>';

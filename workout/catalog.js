@@ -8,7 +8,7 @@ window.CATALOG = {
   assisted_pullup: {
     name: '어시스트 풀업', pattern: 'vertical_pull', equipment: 'assist_machine',
     load: 'assist', measure: 'reps', weight_basis: 'total', increment: 5, rep_range: [6, 8],
-    default_sets: 6, rest_sec: 150, progression: 'double', difficulty: 2,
+    default_sets: 3, rest_sec: 150, progression: 'double', difficulty: 2,
     cue: '당기기 전에 어깨부터 아래로 내리세요',
   },
   dumbbell_press: {
@@ -195,6 +195,8 @@ window.TEMPLATES = {
     ],
   },
 };
+
+window.TEMPLATES.free = { name: '자유', free: true, slots: [] };
 
 window.Catalog = {
   get(id) { return Object.prototype.hasOwnProperty.call(window.CATALOG, id) ? window.CATALOG[id] : null; },
