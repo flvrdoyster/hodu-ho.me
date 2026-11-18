@@ -84,11 +84,25 @@
     try { if (show) toastEl.showPopover(); else toastEl.hidePopover(); } catch (e) {}
   }
 
+  function placeToast() {
+    const sheet = document.getElementById('sheet');
+    const base = sheet && sheet.open ? sheet : document.querySelector('.dock');
+    const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s10')) || 10;
+    const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const top = base ? base.getBoundingClientRect().top : h;
+    toastEl.style.setProperty('--toast-bottom', Math.max(0, h - top + gap) + 'px');
+  }
+
+  function replaceToast() {
+    if (!toastEl.hidden) placeToast();
+  }
+
   function toast(text) {
     toastEl.textContent = text;
     toastEl.hidden = false;
     popToast(false);
     popToast(true);
+    placeToast();
     clearTimeout(toast.t);
     toast.t = setTimeout(() => { toastEl.hidden = true; popToast(false); }, 2400);
   }
@@ -120,6 +134,9 @@
   const def = (it) => E.eff(it.exercise_id, S.increments);
   const unmeasured = (it) => !isTimed(it) && it.target.weight_kg == null;
   const workDone = (it) => it.sets.filter((s) => !s.is_warmup).length;
+  const warmDone = (it) => it.sets.filter((s) => s.is_warmup).length;
+  const warmLeft = (it) => (workDone(it) > 0 ? 0 : Math.max(0, E.warmEst(it.exercise_id, S.sessions) - warmDone(it)));
+  const warmTotal = (it) => warmDone(it) + warmLeft(it);
   const isTimed = (it) => E.isTimed(def(it));
 
   function nextPending(fromUid) {
@@ -154,14 +171,14 @@
     let strengthEnd = null;
     let end = null;
     items().forEach((it) => {
-      if (isTimed(it)) return;
+      if (isTimed(it) || it.status === 'skipped') return;
       it.sets.forEach((x) => {
         const t = x.at ? new Date(x.at).getTime() : NaN;
         if (isFinite(t) && (strengthEnd == null || t > strengthEnd)) strengthEnd = t;
       });
     });
     items().forEach((it) => {
-      if (!isTimed(it) || !it.sets.length) return;
+      if (!isTimed(it) || it.status === 'skipped' || !it.sets.length) return;
       const x = it.sets[0];
       const t = x.at ? new Date(x.at).getTime() : NaN;
       const e = isFinite(t) ? t : (strengthEnd != null && x.duration_sec ? strengthEnd + x.duration_sec * 1000 : null);
@@ -180,7 +197,7 @@
   }
 
   function leftSec(it) {
-    return Math.max(0, it.target.sets - workDone(it)) * setSec(it);
+    return (Math.max(0, it.target.sets - workDone(it)) + warmLeft(it)) * setSec(it);
   }
 
   function projectedSec() {
@@ -190,7 +207,8 @@
   const targetSec = () => D().target_sec || S.settings.target_sec;
   const targetMin = () => Math.round(targetSec() / 60);
   const setSec = (it) => E.setSec(it.exercise_id, S.sessions, it.sets, def(it).rest_sec + 40);
-  const planSec = (it) => it.target.sets * setSec(it);
+  const planSec = (it) => (it.target.sets + warmTotal(it)) * setSec(it);
+  const segSec = (it) => (Math.max(it.target.sets, workDone(it)) + warmTotal(it)) * setSec(it);
 
   function fitToTime(rebuild) {
     const open = (it) => strength(it) && !it.sets.length && it.uid !== D().current;
@@ -217,7 +235,7 @@
     while (over > 0 && changed) {
       changed = false;
       back.forEach((it) => {
-        if (over <= 0 || !open(it) || it.target.sets <= 2) return;
+        if (over <= 0 || !open(it) || it.target.sets <= E.MIN_SETS) return;
         it.target.sets--;
         over -= setSec(it);
         changed = true;
@@ -231,12 +249,12 @@
 
   function sbarHTML(edit) {
     const list = items().filter(strength);
-    const planned = list.reduce((a, it) => a + Math.max(planSec(it), workDone(it) * setSec(it)), 0);
+    const planned = list.reduce((a, it) => a + segSec(it), 0);
     const scale = Math.max(targetSec(), planned, 1);
     const run = D().phase === 'active';
     const segs = list.map((it) => {
-      const sec = Math.max(planSec(it), workDone(it) * setSec(it));
-      const fill = Math.min(1, workDone(it) / Math.max(1, it.target.sets));
+      const sec = segSec(it);
+      const fill = Math.min(1, (warmDone(it) + workDone(it)) / Math.max(1, warmTotal(it) + it.target.sets));
       return '<span class="sbar__s" style="flex:' + sec + ' 0 0"><i style="width:' + (fill * 100) + '%"></i></span>';
     }).join('');
     const free = scale - planned;
@@ -309,6 +327,13 @@
         lab.textContent = Math.floor(elapsedSec() / 60) + ' / ' + targetMin() + '분';
         lab.classList.toggle('is-over', timeUp());
       }
+    }
+    if (S.draft && D().phase === 'active') {
+      const up = timeUp();
+      if (up && !ui.upShown) {
+        ui.upShown = true;
+        if (ui.screen === 'main' && ui.phase === 'rest' && !ui.sheetKind) render();
+      } else if (!up) ui.upShown = false;
     }
     const t = ui.timer;
     if (!t.running) return;
@@ -440,7 +465,7 @@
   const tag = (text) => '<span class="tag">' + text + '</span>';
 
   function topbar(o) {
-    return '<header class="hd">' + (o.left || '') +
+    return '<header class="hd' + (o.fixed ? ' hd--fixed' : '') + '">' + (o.left || '') +
       (o.sub ? '<span class="lbl hd__s">' + esc(o.sub) + '</span>' : '<h1 class="hd__t">' + esc(o.title) + '</h1>') +
       (o.right || '') + '</header>';
   }
@@ -526,11 +551,12 @@
 
   function listHTML() {
     const editing = ui.editing;
-    return '<div class="screen">' + topbar({ title: '목록', left: iconBtn('back-ex', 'back', '운동으로'), right: textBtn('list-edit', editing ? '완료' : '편집') }) +
+    return '<div class="screen">' + topbar({ title: '목록', fixed: true, left: iconBtn('back-ex', 'back', '운동으로'), right: textBtn('list-edit', editing ? '완료' : '편집') }) +
       sbarHTML(true) + rowsHTML(editing ? 'edit' : 'list') +
       '<div class="dock"><div class="quiet"><button type="button" data-act="add">운동 추가</button>' +
+      '<button type="button" data-act="finish">세션 종료</button>' +
       '<button type="button" class="danger" data-act="abandon">기록 버리고 처음으로</button></div>' +
-      hx('<button type="button" class="cta" data-act="finish">세션 종료</button>') + '</div></div>';
+      (editing ? '' : hx('<button type="button" class="cta" data-act="back-ex">지금 운동으로</button>')) + '</div></div>';
   }
 
   function planHTML() {
@@ -691,19 +717,19 @@
       '<div class="dock">' + dock + '</div>';
   }
 
-  function buildLog() {
+  function buildLog(auto) {
     const dr = D();
     const exercises = [];
     dr.items.forEach((it) => {
       if (it.status === 'skipped' || !it.sets.length) return;
       const sets = E.isTimed(def(it))
         ? [Object.assign({}, it.sets[0])]
-        : it.sets.map((s) => Object.assign({}, s));
+        : it.sets.map((s) => { const c = Object.assign({}, s); delete c.wu_manual; return c; });
       const ex = { exercise_id: it.exercise_id, sets };
       if (it.note) ex.note = it.note;
       exercises.push(ex);
     });
-    const bw = dr.bodyweight_kg != null ? dr.bodyweight_kg : S.settings.bodyweight_kg;
+    const bw = dr.bodyweight_kg != null || auto ? dr.bodyweight_kg : S.settings.bodyweight_kg;
     const log = { id: dr.id, date: dr.date, session_type: dr.session_type };
     if (dr.started_at) log.started_at = dr.started_at;
     const st = startMs();
@@ -715,8 +741,8 @@
     return log;
   }
 
-  function commitSession() {
-    const log = buildLog();
+  function commitSession(auto) {
+    const log = buildLog(auto);
     if (log.bodyweight_kg != null) S.settings.bodyweight_kg = log.bodyweight_kg;
     S.sessions.push(log);
     S.sessions.sort(Dt.sessionOrder);
@@ -734,7 +760,7 @@
     const base = last != null ? last : st;
     if (base == null || Date.now() - base < IDLE_END_MS) return false;
     closeSheet();
-    if (last == null) {
+    if (last == null || !buildLog(true).exercises.length) {
       S.draft = null;
       ui.screen = 'main';
       ui.timer.running = false;
@@ -744,7 +770,7 @@
     } else {
       const it = cur();
       if (it && it.sets.length && !isTimed(it)) it.status = 'done';
-      commitSession();
+      commitSession(true);
       toast(Math.round(IDLE_END_MS / 60000) + '분 동안 기록이 없어 세션을 자동으로 저장했어요');
     }
     return true;
@@ -813,6 +839,7 @@
     ui.sheetArg = arg;
     renderSheet();
     if (!sheet.open) sheet.showModal();
+    replaceToast();
   }
 
   function closeSheet() {
@@ -822,7 +849,7 @@
   }
 
   sheet.addEventListener('click', (e) => { if (e.target === sheet) closeSheet(); });
-  sheet.addEventListener('close', () => { ui.sheetKind = null; ui.formKey = null; sheet.innerHTML = ''; });
+  sheet.addEventListener('close', () => { ui.sheetKind = null; ui.formKey = null; sheet.innerHTML = ''; replaceToast(); });
 
   function sheetHead(title) {
     return '<div class="sheet__head"><h2>' + esc(title) + '</h2>' + textBtn('close-sheet', '닫기') + '</div>';
@@ -832,6 +859,8 @@
     const k = ui.sheetKind;
     const key = k + ':' + ui.sheetArg;
     const saved = {};
+    const ae = document.activeElement;
+    const focus = ui.formKey === key && ae && ae.id && sheet.contains(ae) ? { id: ae.id, s: ae.selectionStart, e: ae.selectionEnd } : null;
     if (ui.formKey === key) sheet.querySelectorAll('input,select,textarea').forEach((el) => { saved[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
     ui.formKey = key;
     let html = '';
@@ -866,6 +895,13 @@
       if (!(el.id in saved)) return;
       if (el.type === 'checkbox') el.checked = saved[el.id]; else el.value = saved[el.id];
     });
+    if (focus) {
+      const el = document.getElementById(focus.id);
+      if (el) {
+        el.focus();
+        try { el.setSelectionRange(focus.s, focus.e); } catch (e) { }
+      }
+    }
     const ff = document.getElementById('fF');
     if (ff) sheet.querySelectorAll('[data-act="f-feel"]').forEach((b) => b.classList.toggle('on', b.dataset.v === ff.value));
   }
@@ -919,7 +955,9 @@
   }
 
   function pickerHTML(kind, u) {
-    const all = window.Catalog.ids().filter(E.pickable);
+    const present = {};
+    items().forEach((i) => { if (!(kind === 'swap' && i.uid === u)) present[i.exercise_id] = i; });
+    const all = window.Catalog.ids().filter(E.pickable).filter((id) => !present[id] || (kind === 'add' && present[id].status === 'skipped'));
     let top = [];
     let self = null;
     if (kind === 'swap') {
@@ -929,14 +967,14 @@
       top = all.filter((id) => get(id).pattern === p);
       if (it.slot != null && window.TEMPLATES[D().session_type]) {
         const slot = window.TEMPLATES[D().session_type].slots[it.slot];
-        if (slot) E.candidates(slot).forEach((id) => { if (top.indexOf(id) < 0) top.push(id); });
+        if (slot) E.candidates(slot).forEach((id) => { if (top.indexOf(id) < 0 && all.indexOf(id) >= 0) top.push(id); });
       }
       top = top.filter((id) => id !== self).sort((a, b) => get(a).difficulty - get(b).difficulty);
     }
     const rest = all.filter((id) => id !== self && top.indexOf(id) < 0);
     const pick = (id, showPattern) => '<button type="button" class="li" data-act="pick" data-id="' + id + '">' +
       '<span class="li__t">' + (showPattern ? '<b>' + esc(get(id).name) + '</b>' : esc(get(id).name)) + (isNew(id) ? tag('미측정') : '') + '</span>' +
-      '<span class="li__r">' + (showPattern ? esc(E.PATTERN_NAME[get(id).pattern]) + ' ' : '') + '›</span></button>';
+      '<span class="li__r">' + (present[id] ? '생략함 · 복원 ' : showPattern ? esc(E.PATTERN_NAME[get(id).pattern]) + ' ' : '') + '›</span></button>';
     let html = '';
     if (top.length) html += '<div class="sec">대체 후보</div>' + top.map((id) => pick(id, true)).join('');
     E.PATTERN_ORDER.forEach((p) => {
@@ -958,6 +996,16 @@
   }
 
   const unitBtn = () => '<button type="button" class="unit" data-act="unit-toggle" aria-label="무게 단위 바꾸기">kg ⇄ lbs</button>';
+
+  const LIM = { w: [0, 1000], reps: [1, 200], bw: [20, 300], inc: [0, 100] };
+
+  function fit(v, lim, label, fmt, josa) {
+    const c = Math.max(lim[0], Math.min(lim[1], v));
+    if (c !== v) toast(label + ' ' + fmt(c) + (josa || '으로') + ' 맞췄어요');
+    return c;
+  }
+
+  const fmtKg = (kg) => E.kgToDisp(kg, 2) + S.settings.weight_unit;
 
   function fieldKg(id) {
     const el = document.getElementById(id);
@@ -1103,6 +1151,11 @@
     },
     add() { openSheet('add'); },
     pick(ds) {
+      const dup = items().find((i) => i.exercise_id === ds.id && !(ui.sheetKind === 'swap' && i.uid === ui.sheetArg));
+      if (dup) {
+        if (ui.sheetKind === 'add' && dup.status === 'skipped') { A.skip({ uid: dup.uid }); closeSheet(); return; }
+        return toast('이미 이 세션에 있는 운동이에요');
+      }
       if (ui.sheetKind === 'swap') {
         const i = idxOf(ui.sheetArg);
         items()[i] = retarget(items()[i], ds.id);
@@ -1134,8 +1187,8 @@
       const dir = Number(ds.dir);
       const now = Number(it.target.weight_kg || 0);
       it.target.weight_kg = S.settings.weight_unit === 'lbs'
-        ? Math.max(0, E.dispToKg(E.kgToDisp(now) + 5 * dir))
-        : Math.max(0, E.round(now + Math.abs(d.increment || 1) * dir));
+        ? Math.min(LIM.w[1], Math.max(0, E.dispToKg(E.kgToDisp(now) + 5 * dir)))
+        : Math.min(LIM.w[1], Math.max(0, E.round(now + Math.abs(d.increment || 1) * dir)));
       save();
     },
     'w-edit'() { openSheet('exset'); },
@@ -1144,15 +1197,18 @@
       const id = it.exercise_id;
       const base = get(id);
       const incv = fieldKg('xI');
-      const inc = incv == null ? NaN : incv;
-      const w = fieldKg('xW');
-      if (!(inc > 0)) return toast('증량 폭을 입력해 주세요');
-      if (w != null && !(w >= 0)) return toast('무게를 확인해 주세요');
+      if (!(incv > 0)) return toast('증량 폭을 입력해 주세요');
+      const inc = fit(incv, LIM.inc, '증량 폭을', fmtKg);
+      const w0 = fieldKg('xW');
+      if (w0 != null && isNaN(w0)) return toast('무게를 확인해 주세요');
+      const w = w0 == null ? null : fit(w0, LIM.w, '무게를', fmtKg);
       const needs = !E.hasWeightFor(id, S.sessions);
       if (needs && !(w > 0)) return toast('시작 무게를 입력해 주세요');
       if (Math.abs(inc - base.increment) > 1e-9) S.increments[id] = inc; else delete S.increments[id];
+      const xw = document.getElementById('xW');
+      const edited = xw && xw.value !== xw.dataset.shown;
       items().forEach((i) => {
-        if (i.exercise_id !== id || w == null) return;
+        if (i.exercise_id !== id || w == null || !edited) return;
         if (i.uid === it.uid || (needs && !i.sets.length)) { i.target.weight_kg = w; i.goal_kg = w; }
       });
       save(true);
@@ -1166,11 +1222,15 @@
       E.setUnit(next);
       ids.forEach((id, i) => {
         const el = document.getElementById(id);
-        if (el && kgs[i] != null && isFinite(kgs[i])) el.value = E.kgToDisp(kgs[i], 2);
+        if (el && kgs[i] != null && isFinite(kgs[i])) {
+          const same = el.value === el.dataset.shown;
+          el.value = E.kgToDisp(kgs[i], 2);
+          if (same) { el.dataset.shown = el.value; el.dataset.kg = kgs[i]; }
+        }
       });
       save(true);
     },
-    reps(ds) { ui.reps = Math.max(1, ui.reps + Number(ds.dir)); },
+    reps(ds) { ui.reps = Math.min(LIM.reps[1], Math.max(1, ui.reps + Number(ds.dir))); },
     'ex-sheet'() { openSheet('ex'); },
     'row-sheet'(ds) { openSheet('row', ds.uid); },
     'cut-sheet'() { openSheet('cut'); },
@@ -1186,7 +1246,12 @@
       if (it.target.weight_kg == null) { toast('무게를 먼저 입력해 주세요'); return openSheet('exset'); }
       if (!reps) return toast('횟수를 먼저 입력해 주세요');
       const w = E.dispToKg(E.kgToDisp(it.target.weight_kg, 2));
-      const set = { weight_kg: w, reps, is_warmup: E.isWarmup(def(it), it.goal_kg, it.sets, w), at: new Date().toISOString() };
+      let wu = E.isWarmup(def(it), it.goal_kg, it.sets, w);
+      if (wu) {
+        const same = it.sets.filter((x) => x.is_warmup && !x.wu_manual && E.eq(x.weight_kg, w));
+        if (same.length) { same.forEach((x) => { x.is_warmup = false; }); wu = false; }
+      }
+      const set = { weight_kg: w, reps, is_warmup: wu, at: new Date().toISOString() };
       const prev = it.sets[it.sets.length - 1];
       ui.msg = '';
       if (!set.is_warmup && prev && !prev.is_warmup && !E.heavier(def(it), w, prev.weight_kg) && prev.reps > 0 && reps <= prev.reps * 0.6) ui.msg = '직전 세트보다 40% 넘게 줄었어요. 여기서 마무리해도 좋아요.';
@@ -1266,7 +1331,10 @@
       const it = cur();
       const v = prompt('시간 (분)', it.target.duration_sec == null ? '' : Math.round(it.target.duration_sec / 60));
       if (v == null || v.trim() === '' || isNaN(Number(v))) return;
-      it.target.duration_sec = Math.max(60, Math.round(Number(v)) * 60);
+      const want = Math.round(Number(v)) * 60;
+      const sec = Math.max(60, Math.min(14400, want));
+      if (want !== sec) toast('시간을 ' + Math.round(sec / 60) + '분으로 맞췄어요');
+      it.target.duration_sec = sec;
       save();
     },
     'cardio-done'() {
@@ -1287,11 +1355,13 @@
       const it = cur();
       const s = it.sets[Number(ds.i)];
       const w = fieldKg('fW');
-      const reps = parseInt(document.getElementById('fR').value, 10);
-      if (!(reps >= 1)) return toast('횟수를 확인해 주세요');
-      if (w != null && isFinite(w)) s.weight_kg = w;
+      const raw = parseInt(document.getElementById('fR').value, 10);
+      if (isNaN(raw)) return toast('횟수를 확인해 주세요');
+      const reps = fit(raw, LIM.reps, '횟수를', (n) => n + '회', '로');
+      if (w != null && isFinite(w)) s.weight_kg = fit(w, LIM.w, '무게를', fmtKg);
       s.reps = reps;
-      s.is_warmup = document.getElementById('fWu').checked;
+      const wu = document.getElementById('fWu').checked;
+      if (wu !== !!s.is_warmup) { s.is_warmup = wu; s.wu_manual = true; }
       const feel = document.getElementById('fF').value;
       if (feel) s.feel = feel; else delete s.feel;
       const memo = document.getElementById('fN').value.trim();
@@ -1322,8 +1392,8 @@
       const v = prompt('체중 (kg)', now == null ? '' : now);
       if (v == null) return;
       if (v.trim() === '') { D().bodyweight_kg = null; save(); return; }
-      if (isNaN(Number(v)) || Number(v) <= 0) return toast('체중을 확인해 주세요');
-      D().bodyweight_kg = Number(v);
+      if (isNaN(Number(v))) return toast('체중을 확인해 주세요');
+      D().bodyweight_kg = fit(Number(v), LIM.bw, '체중을', (n) => n + 'kg');
       save();
     },
     'sum-note'() { openSheet('snote'); },
@@ -1335,12 +1405,18 @@
     settings() { openSheet('settings'); },
     'settings-save'() {
       const bw = document.getElementById('sBw').value;
-      S.settings.bodyweight_kg = bw === '' ? null : Number(bw);
+      let clamped = false;
+      if (bw === '') S.settings.bodyweight_kg = null;
+      else {
+        const n = Number(bw);
+        S.settings.bodyweight_kg = fit(n, LIM.bw, '체중을', (x) => x + 'kg');
+        clamped = S.settings.bodyweight_kg !== n;
+      }
       S.settings.sound = document.getElementById('sSound').checked;
       S.settings.haptic = document.getElementById('sHaptic').checked;
       save(true);
       closeSheet();
-      toast('설정을 저장했어요');
+      if (!clamped) toast('설정을 저장했어요');
     },
     export() {
       const data = { version: Dt.VERSION, exported_at: new Date().toISOString(), settings: S.settings, increments: S.increments, sessions: S.sessions };
@@ -1391,6 +1467,7 @@
     fn(el.dataset, el);
     render();
     if (dockSig() !== before) ui.lockUntil = Date.now() + LOCK_MS;
+    replaceToast();
   }
 
   document.addEventListener('click', dispatch);

@@ -1,0 +1,57 @@
+{
+  "id": "uxfaqm7",
+  "date": "2026-11-18",
+  "session_type": "upper",
+  "started_at": "2026-11-17T23:56:20.797Z",
+  "duration_sec": 2079,
+  "exercises": [
+    {
+      "exercise_id": "lat_pulldown",
+      "sets": [
+        { "weight_kg": 20, "reps": 10, "is_warmup": true, "at": "2026-11-17T23:57:19.221Z", "feel": "light" },
+        { "weight_kg": 35, "reps": 10, "is_warmup": false, "at": "2026-11-17T23:58:42.951Z", "feel": "ok" },
+        { "weight_kg": 40, "reps": 10, "is_warmup": false, "at": "2026-11-18T00:01:05.902Z", "feel": "ok" },
+        { "weight_kg": 40, "reps": 10, "is_warmup": false, "at": "2026-11-18T00:03:34.959Z", "feel": "heavy" }
+      ]
+    },
+    {
+      "exercise_id": "bench_press",
+      "sets": [
+        { "weight_kg": 30, "reps": 10, "is_warmup": false, "at": "2026-11-18T00:05:44.820Z", "feel": "light" },
+        { "weight_kg": 35, "reps": 8, "is_warmup": false, "at": "2026-11-18T00:07:03.462Z", "feel": "ok" },
+        { "weight_kg": 35, "reps": 8, "is_warmup": false, "at": "2026-11-18T00:09:27.840Z" }
+      ]
+    },
+    {
+      "exercise_id": "seated_cable_row",
+      "sets": [
+        { "weight_kg": 30, "reps": 10, "is_warmup": false, "at": "2026-11-18T00:11:58.548Z" },
+        { "weight_kg": 30, "reps": 10, "is_warmup": false, "at": "2026-11-18T00:14:13.482Z", "feel": "ok" },
+        { "weight_kg": 30, "reps": 10, "is_warmup": false, "at": "2026-11-18T00:16:19.147Z" },
+        { "weight_kg": 35, "reps": 6, "is_warmup": false, "at": "2026-11-18T00:17:35.897Z", "feel": "heavy" }
+      ]
+    },
+    {
+      "exercise_id": "cable_pushdown",
+      "sets": [
+        { "weight_kg": 12.5, "reps": 11, "is_warmup": false, "at": "2026-11-18T00:19:08.011Z", "feel": "ok" },
+        { "weight_kg": 12.5, "reps": 11, "is_warmup": false, "at": "2026-11-18T00:20:09.342Z" },
+        { "weight_kg": 12.5, "reps": 11, "is_warmup": false, "at": "2026-11-18T00:21:40.374Z" }
+      ]
+    },
+    {
+      "exercise_id": "reverse_pec_deck",
+      "sets": [
+        { "weight_kg": 27.22, "reps": 10, "is_warmup": false, "at": "2026-11-18T00:23:33.891Z" },
+        { "weight_kg": 27.22, "reps": 10, "is_warmup": false, "at": "2026-11-18T00:25:26.006Z", "feel": "ok" },
+        { "weight_kg": 31.75, "reps": 10, "is_warmup": false, "at": "2026-11-18T00:26:46.843Z", "feel": "heavy" }
+      ]
+    },
+    {
+      "exercise_id": "stationary_bike",
+      "sets": [
+        { "duration_sec": 300, "at": "2026-11-18T00:31:00.189Z" }
+      ]
+    }
+  ]
+}

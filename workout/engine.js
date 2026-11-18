@@ -77,10 +77,15 @@
     return def.load === 'assist' ? w < base - 0.1 : w > base + 0.1;
   }
 
-  function atWorkingWeight(ex) {
+  const MIN_SETS = 2;
+
+  function atWorkingWeight(def, ex) {
     const ws = workSets(ex);
     if (!ws.length) return { w: null, sets: [] };
-    const w = ws[ws.length - 1].weight_kg;
+    const heavy = (x, y) => (def.load === 'assist' ? x < y : x > y);
+    const pick = (list) => list.reduce((m, x) => (heavy(x.weight_kg, m) ? x.weight_kg : m), list[0].weight_kg);
+    const repeated = ws.filter((x) => ws.filter((y) => eq(x.weight_kg, y.weight_kg)).length >= MIN_SETS);
+    const w = pick(repeated.length ? repeated : ws);
     return { w, sets: ws.filter((s) => eq(s.weight_kg, w)) };
   }
 
@@ -96,7 +101,7 @@
 
   function doubleRule(def, hist) {
     const [min, max] = def.rep_range;
-    const last = atWorkingWeight(hist[0].ex);
+    const last = atWorkingWeight(def, hist[0].ex);
     if (!last.sets.length) {
       const all = (hist[0].ex.sets || []).filter(isNum);
       const w = all[all.length - 1].weight_kg;
@@ -115,10 +120,11 @@
       if (sets.some((s) => s.feel === 'heavy')) {
         return { weight: w, reps: max, reason: txt + ' 상한 달성, 체감 무거움 → 증량 한 세션 미룸', kind: 'wait' };
       }
-      return { weight: Math.max(0, round(w + inc)), reps: min, reason: txt + ' 전부 상한 달성 → ' + step, kind: 'up' };
+      if (round(w + inc) < 0) return { weight: w, reps: max, reason: txt + ' 전부 상한 달성, 보조 무게가 이미 0 → 무게 유지', kind: 'hold' };
+      return { weight: round(w + inc), reps: min, reason: txt + ' 전부 상한 달성 → ' + step, kind: 'up' };
     }
     if (failCount(sets, min) >= 2) {
-      const prev = hist[1] && atWorkingWeight(hist[1].ex);
+      const prev = hist[1] && atWorkingWeight(def, hist[1].ex);
       if (prev && prev.w != null && eq(prev.w, w) && failCount(prev.sets, min) >= 2) {
         return { weight: Math.max(0, round(w - inc)), reps: min, reason: txt + ', 2회 연속 하한 미달 → ' + (inc > 0 ? '-' : '+') + fmtInc(inc), kind: 'down' };
       }
@@ -133,7 +139,7 @@
 
   function linearRule(def, hist) {
     const reps = def.rep_range[0];
-    const last = atWorkingWeight(hist[0].ex);
+    const last = atWorkingWeight(def, hist[0].ex);
     if (!last.sets.length) {
       const all = (hist[0].ex.sets || []).filter(isNum);
       const w0 = all[all.length - 1].weight_kg;
@@ -147,7 +153,7 @@
       if (last.sets.some((s) => s.feel === 'heavy')) return { weight: w, reps, reason: txt + ' 달성, 체감 무거움 → 증량 한 세션 미룸', kind: 'wait' };
       return { weight: round(w + def.increment), reps, reason: txt + ' 전부 달성 → +' + fmtInc(def.increment), kind: 'up' };
     }
-    const prev = hist[1] && atWorkingWeight(hist[1].ex);
+    const prev = hist[1] && atWorkingWeight(def, hist[1].ex);
     if (prev && prev.w != null && eq(prev.w, w) && prev.sets.length && missed(prev.sets)) {
       const down = Math.round(w * 0.9 / def.increment) * def.increment;
       return { weight: round(down), reps, reason: txt + ', 2회 연속 ' + reps + '회 미달 → 10% 감량', kind: 'down' };
@@ -174,7 +180,7 @@
 
     if (def.progression === 'linear') return Object.assign(base, linearRule(def, hist));
 
-    const last = atWorkingWeight(hist[0].ex);
+    const last = atWorkingWeight(def, hist[0].ex);
     const w = last.sets.length ? last.w : null;
     const low = last.sets.length ? Math.min(...last.sets.map((s) => s.reps)) : def.rep_range[0];
     const reps = Math.max(def.rep_range[0], Math.min(def.rep_range[1], low));
@@ -294,6 +300,16 @@
     return g.length ? Math.round(g.reduce((a, b) => a + b, 0) / g.length) : fallback;
   }
 
+  function warmEst(id, sessions) {
+    const def = get(id);
+    if (!def || isTimed(def) || def.load !== 'weight') return 0;
+    if (def.progression === 'linear') return 2;
+    const h = history(sessions, id).slice(0, 3);
+    if (!h.length) return 0;
+    const n = h.reduce((a, x) => a + (x.ex.sets || []).filter((t) => t.is_warmup).length, 0);
+    return Math.round(n / h.length);
+  }
+
   function localDate(d) {
     const z = (n) => String(n).padStart(2, '0');
     return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate());
@@ -301,6 +317,6 @@
 
   window.Engine = {
     fmtW, fmtMin, isTimed, setUnit, lbsToKg, kgToDisp, dispToKg, fmtInc, eff, eq, history, hasWeightFor, workSets, isWarmup, heavier, recommend, buildSession,
-    candidates, pickable, stage, setSec, localDate, PATTERN_NAME, PATTERN_ORDER, round,
+    candidates, pickable, stage, setSec, warmEst, MIN_SETS, localDate, PATTERN_NAME, PATTERN_ORDER, round,
   };
 })();
