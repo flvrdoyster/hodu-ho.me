@@ -474,22 +474,23 @@
 
   function topbar(o) {
     return '<header class="hd' + (o.fixed ? ' hd--fixed' : '') + '">' + (o.left || '') +
-      (o.sub ? '<span class="lbl hd__s">' + esc(o.sub) + '</span>' : '<h1 class="hd__t">' + esc(o.title) + '</h1>') +
+      (o.sub ? '<span class="lbl hd__s">' + esc(o.sub) + '</span>' : o.title ? '<h1 class="hd__t">' + esc(o.title) + '</h1>' : '<span class="hd__s"></span>') +
       (o.right || '') + '</header>';
   }
 
+  function relDate(date) {
+    const a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+    const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(today());
+    if (!a || !b) return date;
+    const n = Math.round((Date.UTC(+b[1], b[2] - 1, +b[3]) - Date.UTC(+a[1], a[2] - 1, +a[3])) / 86400000);
+    return n < 0 ? date : n === 0 ? '오늘' : n === 1 ? '어제' : n + '일 전';
+  }
+
   function homeHTML() {
-    const last = S.sessions[S.sessions.length - 1];
-    let stage = '<p class="lbl">아직 기록이 없어요.</p>';
-    if (last) {
-      const names = (last.exercises || []).map((e) => (get(e.exercise_id) ? get(e.exercise_id).name : e.exercise_id)).join(', ');
-      stage = '<span class="lbl">지난 세션 · ' + esc(last.date) + '</span>' +
-        '<div class="last__v">' + esc(tplName(last.session_type)) + (last.duration_sec ? '<u>' + Math.round(last.duration_sec / 60) + '분</u>' : '') + '</div>' +
-        '<p class="last__s">' + esc(names) + '</p>';
-    }
+    const recent = S.sessions.slice().sort((a, b) => (b.started_at || b.date).localeCompare(a.started_at || a.date)).slice(0, 2);
+    const stage = '<div class="sec">운동 기록</div>' + (recent.length ? recent.map((x) => '<p class="last">' + esc(relDate(x.date)) + ' · ' + esc(tplName(x.session_type)) + (x.duration_sec ? ' · ' + Math.round(x.duration_sec / 60) + '분' : '') + '</p>').join('') : '<p class="last">아직 기록이 없어요.</p>');
     const btns = Object.keys(window.TEMPLATES).map((k) => '<button type="button" class="cta" data-act="new-session" data-type="' + k + '"><b>' + esc(window.TEMPLATES[k].name) + '</b><small>세션 만들기</small></button>').join('');
-    return '<div class="screen">' + topbar({ title: '운동 기록', right: textBtn('settings', '설정') }) +
-      '<div class="top"><span class="lbl">오늘 ' + esc(today()) + '</span></div>' +
+    return '<div class="screen">' + topbar({ right: textBtn('settings', '설정') }) +
       '<div class="stage">' + stage + '</div><div class="dock"><div class="pick">' + btns + '</div></div></div>';
   }
 
