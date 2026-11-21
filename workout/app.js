@@ -73,6 +73,7 @@
       if (S.draft) localStorage.setItem(DRAFT_KEY, JSON.stringify(S.draft));
       else localStorage.removeItem(DRAFT_KEY);
     } catch (e) { toast('저장 공간에 쓰지 못했어요'); }
+    if (all) Sync.check();
   }
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1076,6 +1077,9 @@
   function syncText(v) {
     const parts = [];
     if (v.pending) parts.push('보내지 못한 세션 ' + v.pending + '개');
+    if (v.pendingData) parts.push('보내지 못한 설정 ' + v.pendingData + '개');
+    if (v.rejectedData) parts.push('올리지 못한 설정 ' + v.rejectedData + '개');
+    if (v.overridden) parts.push('다른 기기의 값으로 바뀐 설정 ' + v.overridden + '개 (이전 값은 기기에 보관)');
     if (v.rejected) parts.push('올리지 못한 세션 ' + v.rejected + '개 (기기에는 그대로 있어요)');
     if (v.unread) parts.push('읽지 못한 서버 세션 ' + v.unread + '개');
     const left = parts.length ? ' · ' + parts.join(' · ') : '';
@@ -1585,7 +1589,55 @@
     if (!S.draft && !ui.sheetKind) render();
   }
 
-  Sync.init({ catalog: window.Catalog, sessions: () => S.sessions, merge: mergeSessions, replace: replaceSessions, same: Dt.sameSession });
+  const SYNC_SETTINGS = ['bodyweight_kg', 'target_sec', 'weight_unit'];
+
+  function syncKeys() {
+    const keys = {};
+    const dflt = Dt.defaultSettings();
+    SYNC_SETTINGS.forEach((f) => {
+      keys['settings.' + f] = {
+        def: dflt[f] == null ? null : dflt[f],
+        get: () => (S.settings[f] == null ? null : S.settings[f]),
+        parse: (v) => {
+          if (v === null && f === 'bodyweight_kg') return { ok: true, value: null };
+          const c = Dt.cleanSettings({ [f]: v });
+          return c[f] === undefined ? { ok: false } : { ok: true, value: c[f] };
+        },
+        set: (v) => {
+          S.settings[f] = v;
+          if (f === 'weight_unit') E.setUnit(v);
+        },
+      };
+    });
+    window.Catalog.ids().forEach((id) => {
+      const d = get(id);
+      if (!d || d.load === 'none') return;
+      keys['increments.' + id] = {
+        def: null,
+        get: () => (S.increments[id] == null ? null : S.increments[id]),
+        parse: (v) => {
+          if (v === null) return { ok: true, value: null };
+          const c = Dt.cleanIncrements({ [id]: v }, window.Catalog);
+          if (c[id] !== undefined) return { ok: true, value: c[id] };
+          return typeof v === 'number' && Math.abs(v - d.increment) < 0.005 ? { ok: true, value: null } : { ok: false };
+        },
+        set: (v) => { if (v === null) delete S.increments[id]; else S.increments[id] = v; },
+      };
+    });
+    return keys;
+  }
+
+  function syncApplied(changed) {
+    fitStoredTime();
+    save(true);
+    if (changed.indexOf('settings.weight_unit') >= 0) {
+      closeSheet();
+      render();
+    } else if (!S.draft && !ui.sheetKind) render();
+  }
+
+  Sync.init({ catalog: window.Catalog, sessions: () => S.sessions, merge: mergeSessions, replace: replaceSessions, same: Dt.sameSession, keys: syncKeys(), applied: syncApplied });
+  Sync.check();
   Sync.onChange(() => { if (ui.sheetKind === 'settings') renderSheet(); });
 
   function loadRepoRecords() {

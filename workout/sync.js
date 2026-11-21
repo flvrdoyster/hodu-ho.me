@@ -14,7 +14,7 @@
   const listeners = [];
 
   function blank() {
-    return { token: '', queue: [], known: [], rejected: [], last: '' };
+    return { token: '', queue: [], known: [], rejected: [], last: '', at: {}, sig: {}, dq: [], dr: [], ov: [], skew: 0 };
   }
 
   function strings(v) {
@@ -31,6 +31,15 @@
       s.known = strings(raw.known);
       s.rejected = strings(raw.rejected);
       if (typeof raw.last === 'string') s.last = raw.last;
+      s.dq = strings(raw.dq);
+      s.dr = strings(raw.dr);
+      s.ov = strings(raw.ov);
+      if (typeof raw.skew === 'number' && isFinite(raw.skew)) s.skew = raw.skew;
+      ['at', 'sig'].forEach((f) => {
+        if (raw[f] && typeof raw[f] === 'object' && !Array.isArray(raw[f])) {
+          Object.keys(raw[f]).forEach((k) => { if (typeof raw[f][k] === 'string') s[f][k] = raw[f][k]; });
+        }
+      });
     }
     return s;
   }
@@ -61,7 +70,7 @@
     else if (busy) kind = 'busy';
     else if (failure === 'network') kind = 'error';
     else if (failure) kind = 'refused';
-    return { kind, pending: s.queue.length, rejected: s.rejected.length, unread, last: s.last, failure };
+    return { kind, pending: s.queue.length, rejected: s.rejected.length, pendingData: s.dq.length, rejectedData: s.dr.length, overridden: s.ov.length, unread, last: s.last, failure };
   }
 
   function api(body) {
@@ -168,6 +177,157 @@
     persist();
   }
 
+  const stamp = () => new Date().toISOString();
+  const wire = (at) => new Date(Date.parse(at) + state().skew).toISOString();
+  const local = (iso) => new Date(Date.parse(iso) - state().skew).toISOString();
+
+  function learn(res) {
+    const t = typeof res.now === 'string' ? Date.parse(res.now) : NaN;
+    if (!isFinite(t)) return;
+    state().skew = t - Date.now();
+  }
+
+  function enqueueData(key) {
+    const s = state();
+    if (s.dq.indexOf(key) < 0 && s.dr.indexOf(key) < 0) { s.dq.push(key); }
+  }
+
+  function keep(key, value) {
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem('workout_v1_replaced_data')) || []; } catch (e) { list = []; }
+    list.push({ key, value, at: stamp() });
+    try { localStorage.setItem('workout_v1_replaced_data', JSON.stringify(list)); } catch (e) { return; }
+  }
+
+  function adopt(key, parsed, serverAt) {
+    const k = cfg.keys[key];
+    const s = state();
+    let differs = false;
+    if (canon(parsed.value) !== canon(k.get())) { k.set(parsed.value); differs = true; }
+    s.sig[key] = canon(k.get());
+    s.at[key] = local(serverAt);
+    s.dq = s.dq.filter((x) => x !== key);
+    return differs;
+  }
+
+  function mine(key) {
+    const s = state();
+    s.at[key] = stamp();
+    s.dr = s.dr.filter((x) => x !== key);
+    enqueueData(key);
+  }
+
+  function check() {
+    if (!enabled() || !cfg || !cfg.keys) return;
+    const s = state();
+    let changed = false;
+    Object.keys(cfg.keys).forEach((key) => {
+      const sig = canon(cfg.keys[key].get());
+      if (s.sig[key] === undefined) { s.sig[key] = sig; changed = true; return; }
+      if (s.sig[key] === sig) return;
+      s.sig[key] = sig;
+      mine(key);
+      changed = true;
+    });
+    if (!changed) return;
+    persist();
+    if (connected() && s.dq.length) run(flushAll);
+    else emit();
+  }
+
+  async function pullData() {
+    if (!cfg.keys) return;
+    if (offline()) { failure = 'network'; return; }
+    const s = state();
+    const res = await api({ action: 'data_list', token: s.token });
+    if (!res.ok || !Array.isArray(res.items)) { fail(res); return; }
+    learn(res);
+    const by = {};
+    res.items.forEach((i) => { if (i && typeof i.key === 'string' && typeof i.updated_at === 'string' && isFinite(Date.parse(i.updated_at))) by[i.key] = i; });
+    const changed = [];
+    Object.keys(cfg.keys).forEach((key) => {
+      const k = cfg.keys[key];
+      const sv = by[key];
+      const cur = k.get();
+      const pristine = canon(cur) === canon(k.def);
+      const at = s.at[key] || '';
+      if (!sv) {
+        if (at) enqueueData(key);
+        else if (!pristine) mine(key);
+        return;
+      }
+      const p = k.parse(sv.value);
+      if (!at) {
+        if (pristine) {
+          if (!p.ok) mine(key);
+          else if (adopt(key, p, sv.updated_at)) changed.push(key);
+        } else if (p.ok && canon(p.value) === canon(cur)) {
+          adopt(key, p, sv.updated_at);
+        } else if (!p.ok || canon(p.value) === canon(k.def)) {
+          mine(key);
+        } else {
+          keep(key, cur);
+          if (s.ov.indexOf(key) < 0) s.ov.push(key);
+          adopt(key, p, sv.updated_at);
+          changed.push(key);
+        }
+        return;
+      }
+      if (!p.ok) { mine(key); return; }
+      const sMs = Date.parse(sv.updated_at);
+      const lMs = Date.parse(at) + s.skew;
+      if (sMs > lMs) { if (adopt(key, p, sv.updated_at)) changed.push(key); }
+      else if (sMs < lMs) enqueueData(key);
+    });
+    persist();
+    if (changed.length && cfg.applied) cfg.applied(changed);
+  }
+
+  async function flushData() {
+    if (!cfg.keys) return;
+    for (;;) {
+      const s = state();
+      s.dq = s.dq.filter((k) => cfg.keys[k]);
+      if (!s.dq.length) { persist(); return; }
+      if (offline()) { failure = 'network'; return; }
+      const keys = s.dq.slice(0, 20);
+      const sent = {};
+      keys.forEach((k) => { if (!s.at[k]) s.at[k] = stamp(); sent[k] = s.at[k]; });
+      const res = await api({ action: 'data_put', token: s.token, items: keys.map((k) => ({ key: k, updated_at: wire(sent[k]), value: cfg.keys[k].get() })) });
+      if (!res.ok) { fail(res); persist(); return; }
+      learn(res);
+      const same = (k) => s.at[k] === sent[k];
+      const saved = strings(res.saved).filter((k) => keys.indexOf(k) >= 0);
+      const stale = (Array.isArray(res.stale) ? res.stale : []).filter((x) => x && typeof x.key === 'string' && typeof x.updated_at === 'string' && isFinite(Date.parse(x.updated_at)) && keys.indexOf(x.key) >= 0);
+      const refused = (Array.isArray(res.rejected) ? res.rejected : []).map((r) => (r && typeof r.key === 'string' ? r.key : '')).filter((k) => keys.indexOf(k) >= 0);
+      if (!saved.length && !stale.length && !refused.length) { failure = 'response'; persist(); return; }
+      saved.forEach((k) => { if (same(k)) s.dq = s.dq.filter((x) => x !== k); });
+      refused.forEach((k) => {
+        if (!same(k)) return;
+        s.dq = s.dq.filter((x) => x !== k);
+        if (s.dr.indexOf(k) < 0) s.dr.push(k);
+      });
+      const changed = [];
+      stale.forEach((x) => {
+        if (!same(x.key)) return;
+        const p = cfg.keys[x.key].parse(x.value);
+        if (!p.ok) { mine(x.key); return; }
+        if (adopt(x.key, p, x.updated_at)) changed.push(x.key);
+      });
+      s.last = stamp();
+      failure = '';
+      persist();
+      if (changed.length && cfg.applied) cfg.applied(changed);
+    }
+  }
+
+  async function flushAll() {
+    failure = '';
+    await flushInner();
+    if (failure) return;
+    await flushData();
+  }
+
   async function run(fn) {
     if (!connected()) return;
     if (busy) { again = true; return; }
@@ -186,11 +346,13 @@
   async function both() {
     await pullInner();
     if (failure) return;
-    await flushInner();
+    await pullData();
+    if (failure) return;
+    await flushAll();
   }
 
   function syncNow(retry) {
-    if (retry) { state().rejected = []; persist(); }
+    if (retry) { state().rejected = []; state().dr = []; state().ov = []; persist(); }
     if (failure && failure !== 'auth') failure = '';
     return run(both);
   }
@@ -198,7 +360,7 @@
   function push(id) {
     if (!id) return Promise.resolve();
     if (connected()) enqueue([id]);
-    return run(flushInner);
+    return run(flushAll);
   }
 
   async function connect(password, label) {
@@ -236,6 +398,11 @@
     s.known = [];
     s.rejected = [];
     s.last = '';
+    s.at = {};
+    s.sig = {};
+    s.dq = [];
+    s.dr = [];
+    s.ov = [];
     unread = 0;
     persist();
     emit();
@@ -250,5 +417,5 @@
     listeners.push(fn);
   }
 
-  root.Sync = { enabled, connected, status, init, push, syncNow, connect, disconnect, reset, onChange, unsynced, noteRemote, markKnown };
+  root.Sync = { enabled, connected, status, init, push, check, syncNow, connect, disconnect, reset, onChange, unsynced, noteRemote, markKnown };
 })(typeof window !== 'undefined' ? window : globalThis);

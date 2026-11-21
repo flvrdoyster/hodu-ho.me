@@ -9,6 +9,16 @@ const COLS = [
   ['updated_at', '갱신', 's'],
   ['json', '세션 JSON', 's'],
 ];
+const DATA_SHEET = '데이터';
+const DATA_COLS = [
+  ['key', '키', 's'],
+  ['updated_at', '갱신 시각', 's'],
+  ['json', 'JSON', 's'],
+];
+const KEY_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/;
+const MAX_KEYS = 200;
+const MAX_DATA_BATCH = 20;
+const MAX_FUTURE = 24 * 60 * 60 * 1000;
 const MAX_ROWS = 5000;
 const MAX_BATCH = 50;
 const MAX_CELL = 45000;
@@ -17,8 +27,8 @@ const FAIL_WINDOW = 10 * 60 * 1000;
 const MAX_TOKENS = 5;
 
 function setup() {
-  const sh = ensureSheet();
-  columns(sh);
+  columns(ensureSheet());
+  dataColumns(ensureDataSheet());
 }
 
 function revokeAll() {
@@ -43,6 +53,8 @@ function doPost(e) {
     if (body.action === 'logout') return out(logout(body.token));
     if (body.action === 'list') return out(list(body));
     if (body.action === 'upsert') return out(upsert(body));
+    if (body.action === 'data_list') return out(dataList(body));
+    if (body.action === 'data_put') return out(dataPut(body));
     return out({ ok: false, error: 'action' });
   } catch (err) {
     return out({ ok: false, error: 'server' });
@@ -143,10 +155,20 @@ function ensureSheet() {
   return ss.getSheetByName(SHEET) || ss.insertSheet(SHEET);
 }
 
-function columns(sh) {
+function ensureDataSheet() {
+  const ss = SpreadsheetApp.getActive();
+  return ss.getSheetByName(DATA_SHEET) || ss.insertSheet(DATA_SHEET);
+}
+
+function dataColumns(sh) {
+  return columns(sh, DATA_COLS);
+}
+
+function columns(sh, cols) {
+  const defs = cols || COLS;
   const last = sh.getLastColumn();
   const head = last > 0 ? sh.getRange(1, 1, 1, last).getValues()[0].map(String) : [];
-  const pos = COLS.map(c => {
+  const pos = defs.map(c => {
     let i = head.indexOf(c[1]);
     if (i < 0) {
       head.push(c[1]);
@@ -288,5 +310,122 @@ function upsert(body) {
     }
     SpreadsheetApp.flush();
     return { ok: true, saved: valid.map(s => s.id), rejected: rejected };
+  });
+}
+
+function validTime(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(s)) return false;
+  const t = new Date(s).getTime();
+  return !isNaN(t) && t <= Date.now() + MAX_FUTURE;
+}
+
+function checkEntry(e) {
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return 'shape';
+  if (typeof e.key !== 'string' || !KEY_PATTERN.test(e.key)) return 'key';
+  if (!validTime(e.updated_at)) return 'time';
+  if (e.value === undefined) return 'value';
+  const j = JSON.stringify(e.value);
+  if (j === undefined || j.length > MAX_CELL) return 'too-large';
+  return '';
+}
+
+function readData() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(DATA_SHEET);
+  if (!sh || sh.getLastRow() < 2) return { items: [], bad: 0 };
+  const vals = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+  const head = vals[0].map(String);
+  const ki = head.indexOf('키');
+  const ti = head.indexOf('갱신 시각');
+  const ji = head.indexOf('JSON');
+  if (ki < 0 || ti < 0 || ji < 0) return null;
+  const items = [];
+  const seen = {};
+  let bad = 0;
+  vals.slice(1).forEach((row, i) => {
+    if (row.every(v => v === '' || v === null)) return;
+    const key = text(row[ki]);
+    let value;
+    try {
+      value = JSON.parse(text(row[ji]));
+    } catch (err) {
+      value = undefined;
+    }
+    if (!KEY_PATTERN.test(key) || seen[key] || value === undefined) {
+      bad++;
+      return;
+    }
+    seen[key] = true;
+    items.push({ key: key, updated_at: text(row[ti]), value: value, row: i + 2 });
+  });
+  return { items: items, bad: bad };
+}
+
+function dataList(body) {
+  if (!authed(body.token)) return { ok: false, error: 'auth' };
+  const d = readData();
+  if (!d) return { ok: false, error: 'sheet' };
+  return { ok: true, now: new Date().toISOString(), items: d.items.map(i => ({ key: i.key, updated_at: i.updated_at, value: i.value })), bad: d.bad };
+}
+
+function dataPut(body) {
+  if (!authed(body.token)) return { ok: false, error: 'auth' };
+  const items = body.items;
+  if (!Array.isArray(items) || !items.length || items.length > MAX_DATA_BATCH) return { ok: false, error: 'shape' };
+  const rejected = [];
+  const latest = {};
+  items.forEach((e, i) => {
+    const why = checkEntry(e);
+    if (why) {
+      rejected.push({ key: e && typeof e.key === 'string' ? e.key : '', index: i, error: why });
+      return;
+    }
+    const n = { key: e.key, updated_at: new Date(e.updated_at).toISOString(), value: e.value };
+    if (!latest[n.key] || latest[n.key].updated_at <= n.updated_at) latest[n.key] = n;
+  });
+  const valid = Object.keys(latest).map(k => latest[k]);
+  if (!valid.length) return { ok: true, now: new Date().toISOString(), saved: [], stale: [], rejected: rejected };
+  return locked(() => {
+    const sh = ensureDataSheet();
+    const pos = dataColumns(sh);
+    const width = sh.getLastColumn();
+    const cur = readData();
+    if (!cur) return { ok: false, error: 'sheet' };
+    const byKey = {};
+    cur.items.forEach(i => { byKey[i.key] = i; });
+    const saved = [];
+    const stale = [];
+    const fresh = [];
+    const cells = (e) => {
+      const row = [];
+      for (let i = 0; i < width; i++) row.push('');
+      row[pos[0] - 1] = e.key;
+      row[pos[1] - 1] = e.updated_at;
+      row[pos[2] - 1] = JSON.stringify(e.value);
+      return row;
+    };
+    valid.forEach(e => {
+      const old = byKey[e.key];
+      if (old && old.updated_at > e.updated_at) {
+        stale.push({ key: old.key, updated_at: old.updated_at, value: old.value });
+        return;
+      }
+      if (old) {
+        sh.getRange(old.row, 1, 1, width).setValues([cells(e)]);
+        saved.push(e.key);
+        return;
+      }
+      fresh.push(e);
+    });
+    if (cur.items.length + fresh.length > MAX_KEYS) {
+      fresh.forEach(e => rejected.push({ key: e.key, index: -1, error: 'full' }));
+    } else if (fresh.length) {
+      const start = Math.max(sh.getLastRow(), 1) + 1;
+      if (sh.getMaxRows() < start + fresh.length - 1) sh.insertRowsAfter(sh.getMaxRows(), start + fresh.length - 1 - sh.getMaxRows());
+      DATA_COLS.forEach((c, i) => { sh.getRange(start, pos[i], fresh.length, 1).setNumberFormat('@'); });
+      sh.getRange(start, 1, fresh.length, width).setValues(fresh.map(cells));
+      fresh.forEach(e => saved.push(e.key));
+    }
+    SpreadsheetApp.flush();
+    return { ok: true, now: new Date().toISOString(), saved: saved, stale: stale, rejected: rejected };
   });
 }
