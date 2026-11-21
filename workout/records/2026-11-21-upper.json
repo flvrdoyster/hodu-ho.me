@@ -1,0 +1,58 @@
+{
+  "id": "sph8lo9",
+  "date": "2026-11-21",
+  "session_type": "upper",
+  "started_at": "2026-11-21T06:46:51.423Z",
+  "duration_sec": 2017,
+  "bodyweight_kg": 75.5,
+  "exercises": [
+    {
+      "exercise_id": "lat_pulldown",
+      "sets": [
+        { "weight_kg": 25, "reps": 12, "is_warmup": true, "at": "2026-11-21T06:47:40.103Z", "feel": "light" },
+        { "weight_kg": 40, "reps": 10, "is_warmup": false, "at": "2026-11-21T06:48:28.722Z", "feel": "heavy" },
+        { "weight_kg": 40, "reps": 10, "is_warmup": false, "at": "2026-11-21T06:50:19.441Z", "feel": "heavy" },
+        { "weight_kg": 40, "reps": 10, "is_warmup": false, "at": "2026-11-21T06:52:08.688Z", "feel": "heavy" }
+      ]
+    },
+    {
+      "exercise_id": "dumbbell_press",
+      "sets": [
+        { "weight_kg": 12, "reps": 10, "is_warmup": false, "at": "2026-11-21T06:54:32.640Z", "feel": "ok" },
+        { "weight_kg": 12, "reps": 10, "is_warmup": false, "at": "2026-11-21T06:56:55.071Z" },
+        { "weight_kg": 12, "reps": 10, "is_warmup": false, "at": "2026-11-21T07:00:07.346Z" }
+      ]
+    },
+    {
+      "exercise_id": "dumbbell_shoulder_press",
+      "sets": [
+        { "weight_kg": 8, "reps": 10, "is_warmup": false, "at": "2026-11-21T07:02:44.181Z" },
+        { "weight_kg": 8, "reps": 10, "is_warmup": false, "at": "2026-11-21T07:04:54.203Z" },
+        { "weight_kg": 8, "reps": 10, "is_warmup": false, "at": "2026-11-21T07:06:45.209Z" }
+      ]
+    },
+    {
+      "exercise_id": "seated_cable_row",
+      "sets": [
+        { "weight_kg": 35, "reps": 8, "is_warmup": false, "at": "2026-11-21T07:08:51.404Z", "feel": "heavy" },
+        { "weight_kg": 30, "reps": 8, "is_warmup": false, "at": "2026-11-21T07:10:31.566Z", "feel": "ok" },
+        { "weight_kg": 30, "reps": 10, "is_warmup": false, "at": "2026-11-21T07:12:19.095Z", "feel": "ok" }
+      ]
+    },
+    {
+      "exercise_id": "cable_pushdown",
+      "sets": [
+        { "weight_kg": 12.5, "reps": 12, "is_warmup": false, "at": "2026-11-21T07:14:28.749Z", "feel": "light" },
+        { "weight_kg": 15, "reps": 12, "is_warmup": false, "at": "2026-11-21T07:16:33.750Z", "feel": "ok" },
+        { "weight_kg": 15, "reps": 12, "is_warmup": false, "at": "2026-11-21T07:17:34.992Z", "feel": "ok" }
+      ]
+    },
+    {
+      "exercise_id": "reverse_pec_deck",
+      "sets": [
+        { "weight_kg": 31.75, "reps": 10, "is_warmup": false, "at": "2026-11-21T07:19:10.745Z", "feel": "ok" },
+        { "weight_kg": 31.75, "reps": 10, "is_warmup": false, "at": "2026-11-21T07:20:28.670Z" }
+      ]
+    }
+  ]
+}
