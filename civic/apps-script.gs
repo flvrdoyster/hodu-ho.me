@@ -15,6 +15,7 @@ const MAX_ROWS = 3000;
 const MAX_FAILS = 8;
 const FAIL_WINDOW = 10 * 60 * 1000;
 const MAX_TOKENS = 5;
+const MAX_IMAGE = 6 * 1024 * 1024;
 
 function setup() {
   TABS.forEach(t => tabColumns(ensureSheet(t.sheet), t));
@@ -46,6 +47,7 @@ function doPost(e) {
     if (body.action === 'check') return out(authed(body.token) ? { ok: true, sheetUrl: SpreadsheetApp.getActive().getUrl() } : { ok: false, error: 'auth' });
     if (body.action === 'logout') return out(logout(body.token));
     if (body.action === 'save') return out(save(body));
+    if (body.action === 'ocr') return out(ocr(body));
     return out({ ok: false, error: 'action' });
   } catch (err) {
     return out({ ok: false, error: 'server', message: String(err && err.message || err) });
@@ -287,5 +289,23 @@ function save(body) {
     return { ok: true, rev: revOf(data) };
   } finally {
     lock.releaseLock();
+  }
+}
+
+function ocr(body) {
+  if (!authed(body.token)) return { ok: false, error: 'auth' };
+  if (typeof Drive === 'undefined' || !Drive.Files) return { ok: false, error: 'no-drive' };
+  const bytes = Utilities.base64Decode(String(body.image || ''));
+  if (!bytes.length) return { ok: false, error: 'image' };
+  if (bytes.length > MAX_IMAGE) return { ok: false, error: 'size' };
+  const blob = Utilities.newBlob(bytes, String(body.mime || 'image/jpeg'), 'civic-ocr.jpg');
+  const name = 'civic-ocr-' + Date.now();
+  const doc = Drive.Files.create
+    ? Drive.Files.create({ name: name, mimeType: 'application/vnd.google-apps.document' }, blob, { ocrLanguage: 'ko', fields: 'id' })
+    : Drive.Files.insert({ title: name, mimeType: 'application/vnd.google-apps.document' }, blob, { ocr: true, ocrLanguage: 'ko' });
+  try {
+    return { ok: true, text: DocumentApp.openById(doc.id).getBody().getText() };
+  } finally {
+    Drive.Files.remove(doc.id);
   }
 }

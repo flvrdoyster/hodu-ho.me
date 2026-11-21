@@ -247,8 +247,92 @@
       .map(e => e.n);
   }
 
+  function parseReceipt(text, stations) {
+    const raw = String(text || '');
+    const lines = raw.split(/\r?\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const flat = lines.join('\n');
+    const num = s => Number(String(s).replace(/[,\s]/g, ''));
+    const out = {};
+    const d = flat.match(/(20\d{2})\s*[.\-\/년]\s*(\d{1,2})\s*[.\-\/월]\s*(\d{1,2})/);
+    if (d) out.date = d[1] + '-' + d[2].padStart(2, '0') + '-' + d[3].padStart(2, '0');
+    const lit = [];
+    lines.forEach(s => {
+      let m;
+      const re = /(\d{1,3}[.,]\d{1,3})\s*(?:L|ℓ|ㅣ|리터)(?![a-z])/gi;
+      while ((m = re.exec(s))) lit.push(num(m[1].replace(',', '.')));
+      if (/수량|주유량|리터/.test(s)) {
+        const k = s.match(/(?:수량|주유량|리터)[^\d]*(\d{1,3}[.,]\d{1,3})/);
+        if (k) lit.unshift(num(k[1].replace(',', '.')));
+      }
+    });
+    const table = {};
+    lines.forEach((s, i) => {
+      const cols = [['unitPrice', /단\s*가/], ['liters', /수\s*량|주유량/], ['amount', /금\s*액/]]
+        .map(c => ({ k: c[0], at: s.search(c[1]) })).filter(c => c.at >= 0).sort((a, b) => a.at - b.at);
+      if (cols.length < 2) return;
+      const nums = [];
+      for (let j = i + 1; j < lines.length && j <= i + 5 && nums.length < cols.length; j++) {
+        if (/부가세|과세|합\s*계/.test(lines[j])) break;
+        (lines[j].match(/\d[\d,]*(?:\.\d+)?/g) || []).forEach(x => {
+          if (/[.,]/.test(x) || x.replace(/\D/g, '').length >= 4) nums.push(Number(x.replace(/,/g, '')));
+        });
+      }
+      if (nums.length < cols.length) return;
+      nums.slice(-cols.length).forEach((v, j) => { if (table[cols[j].k] == null) table[cols[j].k] = v; });
+    });
+    if (table.liters) lit.unshift(table.liters);
+    const liters = lit.find(v => v >= 1 && v <= 120);
+    if (liters) out.liters = liters;
+    const unit = flat.match(/단\s*가[^\d\n]*([\d,]{4,6})/);
+    if (unit && num(unit[1]) >= 800 && num(unit[1]) <= 4000) out.unitPrice = num(unit[1]);
+    else if (table.unitPrice >= 800 && table.unitPrice <= 4000) out.unitPrice = table.unitPrice;
+    const money = [];
+    lines.forEach((s, i) => {
+      if (/할인|적립|포인트|잔액|부가세|세액|과세|공급가/.test(s)) return;
+      const key = /(결제|승인|주유|판매|받을|합계|총|금)\s*액|합\s*계|결제\s*금액|금\s*액/.test(s);
+      const re = /([\d]{1,3}(?:,\d{3})+|\d{4,6})\s*원?/g;
+      let m;
+      while ((m = re.exec(s))) {
+        const v = num(m[1]);
+        if (v < 1000 || v > 500000 || (out.unitPrice && v === out.unitPrice)) continue;
+        if (/^20\d{2}$/.test(m[1])) continue;
+        money.push({ v, key, won: /원/.test(m[0]), i });
+      }
+      if (key && !re.test(s) && lines[i + 1]) {
+        const n = lines[i + 1].match(/^([\d]{1,3}(?:,\d{3})+|\d{4,6})\s*원?$/);
+        if (n && num(n[1]) >= 1000) money.push({ v: num(n[1]), key: true, won: true, i: i + 1 });
+      }
+    });
+    const pick = money.filter(x => x.key)[0] || money.filter(x => x.won).sort((a, b) => b.v - a.v)[0];
+    if (pick) out.amount = pick.v;
+    else if (table.amount >= 1000) out.amount = table.amount;
+    if (!out.liters || !out.unitPrice || !out.amount) {
+      const toks = flat.split(/[\s()]+/).map(x => x.replace(/원$/, ''));
+      const ls = toks.filter(x => /^\d{1,3}\.\d{1,3}$/.test(x)).map(Number).filter(v => v >= 1 && v <= 120);
+      const ps = toks.filter(x => /^(\d{1,3},\d{3}|\d{4})$/.test(x)).map(num).filter(v => v >= 800 && v <= 4000);
+      const as = toks.filter(x => /^(\d{1,3}(,\d{3})+|\d{4,6})$/.test(x)).map(num).filter(v => v >= 1000 && v <= 500000);
+      let hit = null;
+      ls.forEach(l => ps.forEach(p => as.forEach(a => { if (!hit && Math.abs(l * p - a) <= 20) hit = { l, p, a }; })));
+      if (hit) {
+        if (!out.liters) out.liters = hit.l;
+        if (!out.unitPrice) out.unitPrice = hit.p;
+        if (!out.amount) out.amount = hit.a;
+      }
+    }
+    if (!out.liters && out.amount && out.unitPrice) out.liters = Math.round(out.amount / out.unitPrice * 1000) / 1000;
+    if (/고급\s*휘발유|고급유|프리미엄/.test(flat)) out.fuelType = '고급휘발유';
+    else if (/휘발유|가솔린/.test(flat)) out.fuelType = '휘발유';
+    const known = (stations || []).find(s => s && flat.replace(/\s/g, '').includes(String(s).replace(/\s/g, '')));
+    if (known) out.station = known;
+    else {
+      const st = lines.find(s => /주유소|셀프|오일뱅크|칼텍스|에너지|S-?OIL|SK/i.test(s) && s.length <= 40);
+      if (st) out.station = st.replace(/^[^\s:：]{2,6}\s*[:：]\s*/, '').replace(/\(\s*주\s*\)|㈜|주식회사/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return out;
+  }
+
   const api = {
-    DAY, pd, ymd, addMonths, daysBetween, calcPart, inspectionWindow, careTips, weatherTips, fuelStats, FUEL_WIN, FUEL_MIN, stationChoices,
+    DAY, pd, ymd, addMonths, daysBetween, calcPart, inspectionWindow, careTips, weatherTips, fuelStats, FUEL_WIN, FUEL_MIN, stationChoices, parseReceipt,
     REC_COLS, COL_KO, recordsToCSV, parseCSV, csvToRecords, mergeById, normDate, toNum,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

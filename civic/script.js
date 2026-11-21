@@ -7,9 +7,11 @@
   const TOKEN_KEY = 'civic:token';
   const CACHE_KEY = 'civic:sheet';
   const WANT_EDIT = /[?&]edit(=|&|$)/.test(location.search);
+  const WANT_QUICK = /[?&]quick(=|&|$)/.test(location.search);
   let EDIT = false;
   const WRITE = new Set(['editKm', 'cancelKm', 'saveKm', 'new', 'edit', 'save', 'cancel', 'del', 'replaced', 'issueDone',
-    'backup', 'restore', 'csvExport', 'csvImport', 'csvApply', 'csvClear', 'saveVehicle', 'logout', 'retry', 'seed', 'copyVin']);
+    'backup', 'restore', 'csvExport', 'csvImport', 'csvApply', 'csvClear', 'saveVehicle', 'logout', 'retry', 'seed', 'copyVin',
+    'quick', 'quickManual', 'quickEdit', 'quickRetry', 'quickSave', 'quickClose']);
   const ed = html => EDIT ? html : '';
   const COLS = ['records', 'parts', 'inspections', 'issues', 'policies', 'fuel'];
   const KEYS = COLS.concat('settings');
@@ -315,7 +317,7 @@
     const recent = D.records.slice().sort(byDateDesc).slice(0, 3);
     const more = v => `<button class="btn ghost" data-act="tab" data-v="${v}">전체 보기</button>`;
 
-    return `${ed('<div class="quick"><button class="btn primary" data-act="new" data-type="fuel">주유 추가</button></div>')}<div class="kpis">
+    return `${ed('<div class="quick"><button class="btn primary" data-act="quick">주유 추가</button></div>')}<div class="kpis">
       ${tile('종합검사', insp)}
       ${tile('자동차보험', policyHTML())}
       ${tile('소모품', parts, more('parts'))}
@@ -505,7 +507,7 @@
   }
 
   const kmpl = n => n == null ? '-' : n.toFixed(1);
-  const lit = n => (+Number(n).toFixed(2)).toString();
+  const lit = n => (+Number(n).toFixed(3)).toString();
   function fuelChart(rows) {
     const W = 640, H = 220, Lm = 44, R = 14, T = 16, B = 28;
     if (rows.length < 2) return null;
@@ -536,7 +538,7 @@
     const fc = fuelChart(ecoRows);
     CH = fc ? [{ id: 'c3', c: fc }] : [];
     const tile = (label, big, meta) => `<section class="panel tile"><h2 class="sec">${label}</h2><div class="big num">${big}</div><div class="meta muted">${meta}</div></section>`;
-    const add = ed('<button class="btn primary" data-act="new" data-type="fuel">주유 추가</button>');
+    const add = ed('<button class="btn primary" data-act="quick">주유 추가</button>');
     if (!list.length) return `<div class="bar-row"><p class="hint">주유할 때마다 기록하면 연비와 주유비가 계산돼요.</p>${add}</div><div class="empty"><b>아직 주유 기록이 없어요</b>${ed('주유 추가로 첫 기록을 남기세요. 주행거리까지 적어 두면 기록이 쌓이면서 연비가 나와요.')}</div>`;
     return `<div class="bar-row"><p class="hint">연비는 주유 사이에 달린 거리를 그 사이 넣은 기름 양으로 나눈 추정값이에요. 가득 주유가 아니면 탱크에 남은 양을 알 수 없어서, 거리가 짧을수록 오차가 크고 기록이 쌓일수록 정확해져요.</p>${add}</div>
     <div class="kpis">
@@ -713,6 +715,92 @@
     reader.readAsText(file, 'utf-8');
   }
 
+
+  const OCR_ERR = { auth: '로그인이 풀렸어요. 다시 로그인하세요.', 'no-drive': '서버에 Drive 서비스가 켜져 있지 않아요.', size: '사진이 너무 커요.', image: '사진이 비어 있어요.', server: '서버에서 읽다가 오류가 났어요.' };
+  function shrink(file) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        res(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('사진을 열지 못했어요.')); };
+      img.src = url;
+    });
+  }
+  async function quickPhoto(file) {
+    S.quick = { step: 'reading' }; render();
+    let fields = null, err = '';
+    try {
+      const image = await shrink(file);
+      const r = await call('ocr', { token: SYNC.token, image, mime: 'image/jpeg' });
+      if (!r || !r.ok) err = OCR_ERR[r && r.error] || '영수증을 읽지 못했어요.';
+      else fields = L.parseReceipt(r.text, stations());
+    } catch (e) { err = e.message && /사진/.test(e.message) ? e.message : '서버에 연결하지 못했어요.'; }
+    if (fields) {
+      fields = Object.assign({ fuelType: '휘발유', station: stations()[0] || '' }, fields);
+      if (!fields.date) { fields.date = todayStr(); fields.dateGuess = true; }
+      if (!fields.liters) err = '주유량을 찾지 못했어요. 직접 입력에서 채워 주세요.';
+    }
+    S.quick = err ? { step: 'fail', err, fields } : { step: 'ready', fields };
+    render();
+    const k = $('#qKm'); if (k) k.focus();
+  }
+  function kmCells(v) {
+    const hint = String(curKm() || '').padStart(6, '0');
+    return [0, 1, 2, 3, 4, 5].map(i => (i === 3 ? '<span class="sep"></span>' : '') + (i < v.length
+      ? `<span class="d">${v[i]}</span>` : `<span class="d z">${hint[i]}</span>`)).join('');
+  }
+  function quickHTML() {
+    const q = S.quick, f = q.fields || {};
+    const shoot = (label, cls) => `<label class="btn ${cls} file-btn">${label}<input id="qPhoto" type="file" accept="image/*" capture="environment"></label>`;
+    if (q.step === 'reading') return `<section class="panel qpanel"><h3>영수증 읽는 중…</h3><p class="hint">사진을 줄여 보내고 글자를 읽고 있어요. 몇 초 걸려요.</p></section>`;
+    if (q.step === 'done') {
+      const r = q.rec;
+      return `<section class="panel qpanel"><h3>저장했어요</h3><p class="qline">${esc(r.date)} · ${esc(r.station || '주유')} · <span class="num">${lit(r.liters)}L</span>${r.amount ? ` · <span class="num">${won(r.amount)}</span>` : ''}${r.km ? ` · <span class="num">${fmt(r.km)}km</span>` : ' · 주행거리 없음'}</p>
+        <div class="actions">${shoot('하나 더 찍기', 'primary')}<button class="btn" data-act="quickClose">닫기</button></div></section>`;
+    }
+    if (q.step === 'ready') {
+      const price = f.amount && f.liters ? Math.round(f.amount / f.liters) : f.unitPrice;
+      return `<section class="panel qpanel"><h3>이렇게 읽었어요</h3>
+        <dl class="qsum"><div><dt>날짜</dt><dd class="num">${esc(f.date)}${f.dateGuess ? ' <span class="hint">(못 읽어서 오늘)</span>' : ''}</dd></div>
+        <div><dt>주유소</dt><dd>${esc(f.station || '-')}</dd></div>
+        <div><dt>주유량</dt><dd class="num">${lit(f.liters)}L</dd></div>
+        <div><dt>금액</dt><dd class="num">${f.amount ? won(f.amount) : '-'}${price ? ` <span class="hint">${fmt(price)}원/L</span>` : ''}</dd></div>
+        <div><dt>유종</dt><dd>${esc(f.fuelType || '')}</dd></div></dl>
+        <label class="qkm-l">계기판 주행거리<span class="qkm"><span class="odo px" id="qKmCells">${kmCells('')}</span><input id="qKm" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="계기판 주행거리 6자리"></span></label>
+        <p class="hint" id="qMsg">6자리를 넣으면 바로 저장돼요. 모르면 비우고 저장하세요.</p>
+        <div class="actions"><button class="btn primary" data-act="quickSave">저장</button><button class="btn" data-act="quickEdit">고치기</button>${shoot('다시 찍기', 'ghost')}</div></section>`;
+    }
+    return `<section class="panel qpanel"><h3>주유 기록</h3>
+      <p class="hint${q.step === 'fail' ? ' qerr' : ''}">${q.step === 'fail' ? esc(q.err) : '영수증을 찍으면 날짜·주유량·금액·주유소를 읽어 와요.'}</p>
+      <div class="actions qstart">${shoot(q.step === 'fail' ? '다시 찍기' : '영수증 찍기', 'primary')}<button class="btn" data-act="quickManual">직접 입력</button><button class="btn ghost" data-act="quickClose">닫기</button></div></section>`;
+  }
+  function quickKm(input) {
+    const v = input.value.replace(/\D/g, '').slice(0, 6);
+    if (input.value !== v) input.value = v;
+    $('#qKmCells').innerHTML = kmCells(v);
+    const msg = $('#qMsg');
+    clearTimeout(quickKm.t);
+    if (v.length < 6) { msg.textContent = '6자리를 넣으면 바로 저장돼요. 모르면 비우고 저장하세요.'; return; }
+    const km = Number(v), cur = curKm();
+    if (cur && km < cur) { msg.textContent = `현재 주행거리(${fmt(cur)}km)보다 작아요. 맞으면 저장을 누르세요.`; return; }
+    if (cur && km - cur > 10000) { msg.textContent = `현재보다 ${fmt(km - cur)}km 많아요. 맞으면 저장을 누르세요.`; return; }
+    msg.textContent = '저장하는 중…';
+    quickKm.t = setTimeout(() => { if ($('#qKm') && $('#qKm').value === v) H.quickSave(); }, 500);
+  }
+  function quickForm() {
+    const f = (S.quick && S.quick.fields) || {};
+    const km = $('#qKm') && $('#qKm').value.length === 6 ? Number($('#qKm').value) : null;
+    S.quick = null;
+    const data = Object.assign(formDefaults('fuel'), { km }, ['date', 'liters', 'amount', 'station', 'fuelType'].reduce((o, k) => (f[k] != null && f[k] !== '' ? Object.assign(o, { [k]: f[k] }) : o), {}));
+    openForm({ type: 'fuel', id: null, data });
+  }
+
   const leaveEdit = () => { location.href = location.pathname + location.hash; };
   const LOGIN_ERR = { password: '비밀번호가 맞지 않아요.', locked: '실패가 많아 잠시 잠겼어요. 10분 뒤에 다시 시도하세요.', 'no-password': '서버에 비밀번호가 설정되지 않았어요.' };
 
@@ -756,6 +844,31 @@
       call('logout', { token: SYNC.token }).catch(() => {});
       store.del(TOKEN_KEY); SYNC.token = '';
       leaveEdit();
+    },
+    quick() { S.quick = { step: 'start' }; S.editing = null; S.returnY = window.scrollY; render(); const t = $('#tabs'); if (t && !document.body.classList.contains('quick-app')) window.scrollTo(0, Math.max(0, t.getBoundingClientRect().top + window.scrollY - 8)); },
+    quickManual() { quickForm(); },
+    quickEdit() { quickForm(); },
+    quickRetry() { S.quick = { step: 'start' }; render(); },
+    quickClose() {
+      S.quick = null;
+      document.body.classList.remove('quick-app');
+      render();
+      window.scrollTo(0, S.returnY || 0);
+    },
+    quickSave() {
+      const q = S.quick;
+      if (!q || q.step !== 'ready') return;
+      clearTimeout(quickKm.t);
+      const v = $('#qKm') ? $('#qKm').value : '';
+      if (v && v.length < 6) { $('#qMsg').textContent = '주행거리는 숫자 6개예요.'; return; }
+      const f = q.fields, km = v ? Number(v) : null;
+      const rec = { id: newId(), date: f.date, km, liters: f.liters, amount: f.amount || null, station: f.station || '', fuelType: f.fuelType || '휘발유', note: '' };
+      const before = { cur: D.settings.currentKm, date: D.settings.kmDate };
+      D.fuel.push(rec);
+      if (km && km > D.settings.currentKm) { D.settings.currentKm = km; D.settings.kmDate = rec.date; }
+      if (!saveData()) { D.fuel.pop(); D.settings.currentKm = before.cur; D.settings.kmDate = before.date; return; }
+      S.quick = { step: 'done', rec };
+      render();
     },
     retry() { queue = queue.then(flush); },
     reload() { location.reload(); },
@@ -854,6 +967,7 @@
     if (S.loading) { $('#view').innerHTML = '<div class="empty">불러오는 중…</div>'; return; }
     if (S.fatal) { $('#view').innerHTML = `<div class="empty"><b>${esc(S.fatal)}</b><div class="actions" style="margin-top:12px"><button class="btn" data-act="reload">다시 시도</button><button class="btn" data-act="cancelLogin">보기 모드로</button></div></div>`; return; }
     if (S.login) { $('#view').innerHTML = loginHTML(); return; }
+    if (S.quick && EDIT) { $('#view').innerHTML = quickHTML(); return; }
     if (S.editing) { $('#view').innerHTML = formHTML(); return; }
     $('#view').innerHTML = bodyHTML();
     if (S.tab === 'stats' || S.tab === 'fuel') CH.forEach(x => bindTip($('#' + x.id), x.c));
@@ -864,6 +978,7 @@
     if (b && H[b.dataset.act] && (EDIT || !WRITE.has(b.dataset.act))) H[b.dataset.act](b, e);
   });
   document.addEventListener('input', e => {
+    if (e.target.id === 'qKm') { quickKm(e.target); return; }
     if (e.target.id === 'q') { S.q = e.target.value; const l = $('#loglist'); if (l) l.innerHTML = logListHTML(); }
   });
   document.addEventListener('change', e => {
@@ -874,6 +989,7 @@
       if (!c.hidden) c.focus();
     }
     if (e.target.id === 'file' && e.target.files[0]) onFile(e.target.files[0]);
+    if (e.target.id === 'qPhoto' && e.target.files[0]) quickPhoto(e.target.files[0]);
   });
   document.addEventListener('keydown', e => { if (EDIT && e.key === 'Enter' && e.target.id === 'kmInput') H.saveKm(); });
   document.addEventListener('submit', e => { if (e.target.id === 'loginForm') { e.preventDefault(); H.login(); } });
@@ -888,7 +1004,9 @@
   async function enterEdit() {
     EDIT = true; S.login = false; S.fatal = ''; S.loading = true; render();
     try { await loadRemote(); } catch (e) { S.fatal = '시트를 불러오지 못해 편집할 수 없어요.'; }
-    S.loading = false; applyHash(); render();
+    S.loading = false; applyHash();
+    if (WANT_QUICK && !S.fatal) { S.quick = { step: 'start' }; document.body.classList.add('quick-app'); }
+    render();
   }
   async function boot() {
     applyHash();

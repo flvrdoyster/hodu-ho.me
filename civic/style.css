@@ -180,3 +180,19 @@ label.f textarea{min-height:92px;resize:vertical}
 .editbar .sync.conflict,.editbar .sync.error,.editbar .sync.auth{color:var(--crit-text);font-weight:600}
 .editbar .sync.saved{color:var(--muted)}
 .login{max-width:360px}
+.file-btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center}
+.file-btn input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.qpanel{display:grid;gap:12px}
+.qpanel h3{margin:0}
+.qstart .btn.primary{padding:12px 20px;font-size:16px}
+.qerr{color:var(--crit-text)}
+.qline{margin:0;color:var(--ink2)}
+.qsum{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0;font-size:14px}
+.qsum div{display:contents}
+.qsum dt{color:var(--muted)}
+.qsum dd{margin:0;color:var(--ink);font-weight:500}
+.qkm-l{display:grid;gap:8px;font-size:12.5px;color:var(--ink2)}
+.qkm{position:relative;display:inline-flex;width:max-content}
+.qkm input{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:0;caret-color:transparent}
+.qkm:focus-within .odo .d{border-color:var(--accent)}
+body.quick-app .garage,body.quick-app #tabs{display:none}
