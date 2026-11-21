@@ -1,5 +1,5 @@
 (function (root) {
-  const URL = '';
+  const URL = 'https://script.google.com/macros/s/AKfycbxHrcfnigsvaxlL35IP-GUGMg57z9B9vURiYO2xjEUxShOafl9kcBiptnhgBSwrmRlk/exec';
   const KEY = 'workout_v1_sync';
   const BATCH = 20;
   const TIMEOUT_MS = 25000;
