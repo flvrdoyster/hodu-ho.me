@@ -600,7 +600,7 @@
       { k: 'mileageStartKm', l: '마일리지 최초 주행거리(km)', t: 'num' }, { k: 'mileageStartDate', l: '최초 주행거리 확인일', t: 'date' },
       { k: 'mileageLimitKm', l: '마일리지 약정 상한(km)', t: 'num' }, { k: 'note', l: '메모', t: 'area', w: 1 }] },
     fuel: { col: 'fuel', title: '주유 기록', fields: [
-      { k: 'date', l: '날짜', t: 'date', req: 1 }, { k: 'km', l: '주행거리(km)', t: 'num' },
+      { k: 'date', l: '날짜', t: 'date', req: 1 }, { k: 'km', l: '주행거리(km, 모르면 비워 두기)', t: 'num' },
       { k: 'liters', l: '주유량(L)', t: 'num', req: 1, d: 1 }, { k: 'amount', l: '금액(원)', t: 'num' },
       { k: 'station', l: '주유소', t: 'station' }, { k: 'fuelType', l: '유종', t: 'sel', o: [['휘발유', '휘발유'], ['고급휘발유', '고급휘발유']] },
       { k: 'note', l: '메모', t: 'area', w: 1 }] },
