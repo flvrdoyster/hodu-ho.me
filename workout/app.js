@@ -762,6 +762,7 @@
     ui.timer.running = false;
     if (wakeLock) wakeLock.release();
     save(true);
+    Sync.push(log.id);
   }
 
   function endIfIdle() {
@@ -1056,15 +1057,62 @@
       '<button type="button" class="btn btn--plain danger" data-act="set-del" data-i="' + i + '">세트 삭제</button>';
   }
 
+  function exportText(list) {
+    const data = { version: Dt.VERSION, exported_at: new Date().toISOString(), settings: S.settings, increments: S.increments, sessions: list };
+    const text = JSON.stringify(data, null, 2);
+    const fallback = () => {
+      ui.exportText = text;
+      openSheet('export');
+      const ta = document.getElementById('exportText');
+      if (ta) { ta.focus(); ta.select(); }
+    };
+    try {
+      navigator.clipboard.writeText(text).then(() => toast('기록 ' + list.length + '개를 클립보드에 복사했어요'), fallback);
+    } catch (e) { fallback(); }
+  }
+
+  const REFUSED = { response: '서버 응답을 읽지 못했어요 · 배포 설정을 확인해 주세요', busy: '서버가 바빠요 · 잠시 뒤에 다시 보내요' };
+
+  function syncText(v) {
+    const parts = [];
+    if (v.pending) parts.push('보내지 못한 세션 ' + v.pending + '개');
+    if (v.rejected) parts.push('올리지 못한 세션 ' + v.rejected + '개 (기기에는 그대로 있어요)');
+    if (v.unread) parts.push('읽지 못한 서버 세션 ' + v.unread + '개');
+    const left = parts.length ? ' · ' + parts.join(' · ') : '';
+    const at = v.last ? new Date(v.last) : null;
+    const when = at ? (at.getMonth() + 1) + '/' + at.getDate() + ' ' + String(at.getHours()).padStart(2, '0') + ':' + String(at.getMinutes()).padStart(2, '0') : '';
+    if (v.kind === 'signed-out') return '연결되지 않았어요' + left;
+    if (v.kind === 'auth') return '다시 연결해 주세요' + left;
+    if (v.kind === 'busy') return '동기화하는 중…' + left;
+    if (v.kind === 'error') return '서버에 닿지 않았어요 · 연결이 돌아오면 다시 보내요' + left;
+    if (v.kind === 'refused') return (REFUSED[v.failure] || '서버가 요청을 받아들이지 않았어요 (' + v.failure + ')') + left;
+    return '연결됨' + (when ? ' · 마지막 동기화 ' + when : '') + left;
+  }
+
+  function syncHTML() {
+    if (!Sync.enabled()) return '';
+    const v = Sync.status();
+    const signed = v.kind === 'signed-out' || v.kind === 'auth';
+    return '<div class="sec">기록 서버</div><p class="lbl">' + esc(syncText(v)) + '</p>' +
+      (signed ? '<label class="field"><span class="sec">비밀번호</span><input class="input" id="sPw" type="password" autocomplete="current-password"></label>' +
+        '<div class="sec"></div><button type="button" class="btn" data-act="sync-connect">연결</button>'
+        : '<div class="sec"></div><button type="button" class="btn" data-act="sync-now">지금 동기화</button>' +
+          '<button type="button" class="btn btn--plain" data-act="sync-off">연결 끊기</button>');
+  }
+
   function settingsHTML() {
     const st = S.settings;
     const last = S.sessions[S.sessions.length - 1];
+    const n = Sync.unsynced(S.sessions).length;
+    const miss = Sync.enabled() ? '올라가지 않은' : 'records/에 없는';
     return '<label class="field"><span class="sec">체중 (kg)</span><input class="input" id="sBw" type="number" inputmode="decimal" step="0.1" value="' + esc(st.bodyweight_kg == null ? '' : st.bodyweight_kg) + '"></label>' +
       '<div class="sec"></div><label class="li li--first"><span>휴식 끝 소리</span><input type="checkbox" class="sw" id="sSound"' + (st.sound ? ' checked' : '') + '></label>' +
       '<label class="li"><span>햅틱</span><input type="checkbox" class="sw" id="sHaptic"' + (st.haptic ? ' checked' : '') + '></label>' +
       '<button type="button" class="cta" data-act="settings-save">설정 저장</button>' +
+      syncHTML() +
       '<div class="sec">저장된 세션 ' + S.sessions.length + '개' + (last ? ' · 최근 ' + esc(last.date) : '') + '</div>' +
-      '<button type="button" class="btn" data-act="export">기록 복사 (JSON)</button>' +
+      '<button type="button" class="btn" data-act="export">' + (n ? '기록 복사 (' + miss + ' ' + n + '개)' : '기록 복사 (' + miss + ' 기록 없음)') + '</button>' +
+      '<button type="button" class="btn btn--plain" data-act="export-all">전체 기록 복사</button>' +
       '<button type="button" class="btn btn--plain danger" data-act="wipe">모든 데이터 지우기</button>';
   }
 
@@ -1429,23 +1477,33 @@
       closeSheet();
       if (!clamped) toast('설정을 저장했어요');
     },
+    'sync-connect'() {
+      const el = document.getElementById('sPw');
+      const pw = el ? el.value : '';
+      if (!pw.trim()) return toast('비밀번호를 입력해 주세요');
+      Sync.connect(pw, navigator.userAgent.slice(0, 40)).then((r) => {
+        if (r.error === 'busy-local') return;
+        if (!r.ok) return toast({ password: '비밀번호가 맞지 않아요', locked: '잠시 뒤에 다시 시도해 주세요', busy: '서버가 바빠요. 잠시 뒤에 다시 시도해 주세요', response: '서버 응답을 읽지 못했어요', 'no-password': '서버에 비밀번호가 정해져 있지 않아요' }[r.error] || '연결하지 못했어요');
+        toast('연결했어요');
+        Sync.syncNow();
+      });
+    },
+    'sync-now'() { Sync.syncNow(true); },
+    'sync-off'() {
+      if (!confirm('이 기기의 연결을 끊을까요? 서버에 있는 기록은 그대로예요.')) return;
+      Sync.disconnect();
+    },
+    'export-all'() { exportText(S.sessions); },
     export() {
-      const data = { version: Dt.VERSION, exported_at: new Date().toISOString(), settings: S.settings, increments: S.increments, sessions: S.sessions };
-      const text = JSON.stringify(data, null, 2);
-      const fallback = () => {
-        ui.exportText = text;
-        openSheet('export');
-        const ta = document.getElementById('exportText');
-        if (ta) { ta.focus(); ta.select(); }
-      };
-      try {
-        navigator.clipboard.writeText(text).then(() => toast('기록을 클립보드에 복사했어요'), fallback);
-      } catch (e) { fallback(); }
+      const list = Sync.unsynced(S.sessions);
+      if (!list.length) return toast('서버나 records/에 없는 기록이 없어요. 전체 기록 복사를 쓰세요');
+      exportText(list);
     },
     wipe() {
       if (!confirm('세션 기록·진행 중 세션·설정을 모두 지울까요? 되돌릴 수 없어요.')) return;
       if (!confirm('정말 지울까요? 먼저 기록 복사를 해 두는 것을 권해요.')) return;
       S = Dt.emptyStore();
+      Sync.reset();
       E.setUnit('kg');
       save(true);
       closeSheet();
@@ -1510,10 +1568,30 @@
   save(true);
   render();
 
+  function replaceSessions(list) {
+    const old = S.sessions.filter((x) => list.some((y) => y.id === x.id));
+    const kept = readJson('workout_v1_replaced');
+    try { localStorage.setItem('workout_v1_replaced', JSON.stringify((Array.isArray(kept) ? kept : []).concat(old))); } catch (e) { toast('교체 전 기록을 보관하지 못했어요'); }
+    S.sessions = S.sessions.filter((x) => !list.some((y) => y.id === x.id)).concat(list).sort(Dt.sessionOrder);
+    save(true);
+    if (!S.draft && !ui.sheetKind) render();
+  }
+
+  function mergeSessions(incoming) {
+    const m = Dt.addMissing(S.sessions, incoming);
+    if (!m.added) return;
+    S.sessions = m.sessions;
+    save(true);
+    if (!S.draft && !ui.sheetKind) render();
+  }
+
+  Sync.init({ catalog: window.Catalog, sessions: () => S.sessions, merge: mergeSessions, replace: replaceSessions, same: Dt.sameSession });
+  Sync.onChange(() => { if (ui.sheetKind === 'settings') renderSheet(); });
+
   function loadRepoRecords() {
-    if (typeof fetch !== 'function') return;
+    if (typeof fetch !== 'function') return Promise.resolve();
     const get1 = (url) => fetch(url, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    get1('records/index.json').then((list) => {
+    return get1('records/index.json').then((list) => {
       if (!Array.isArray(list)) return;
       const names = list.filter((n) => typeof n === 'string' && /^[A-Za-z0-9._-]+\.json$/.test(n) && n !== 'index.json');
       return Promise.all(names.map((n) => get1('records/' + n)));
@@ -1526,12 +1604,9 @@
         if (!r.error) r.sessions.forEach((s) => incoming.push(s));
       });
       if (!incoming.length) return;
-      const m = Dt.addMissing(S.sessions, incoming);
-      if (!m.added) return;
-      S.sessions = m.sessions;
-      save(true);
-      if (!S.draft && !ui.sheetKind) render();
+      mergeSessions(incoming);
+      Sync.noteRemote(S.sessions, incoming);
     }).catch(() => {});
   }
-  loadRepoRecords();
+  loadRepoRecords().then(() => Sync.syncNow());
 })();
